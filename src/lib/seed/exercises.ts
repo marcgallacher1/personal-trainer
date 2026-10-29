@@ -29,6 +29,8 @@ export interface ExerciseSeed {
   pattern: MovementPattern
   compound: boolean
   restSeconds: number
+  /** Original name used to derive the stable seed ID, when the display name has since changed. */
+  idName?: string
   /** Primary movers, weight 1.0 */
   primary: MuscleId[]
   /** Secondary movers, weight 0.5 */
@@ -228,7 +230,7 @@ const MULTI: Row[] = [
   ['Smith Machine Split Squat', 'smith', 'lunge', ['quads', 'glutes'], ['adductors']],
   ['Lateral Lunge', 'dumbbell', 'lunge', ['adductors', 'quads'], ['glutes']],
   // Carry
-  ["Farmer's Carry", 'dumbbell', 'carry', ['forearms', 'upper_back'], ['abs', 'obliques']],
+  ["Farmer's Walk", 'dumbbell', 'carry', ['forearms', 'upper_back'], ['abs', 'obliques']],
   ['Suitcase Carry', 'dumbbell', 'carry', ['obliques', 'forearms'], ['upper_back']],
   ['Trap Bar Carry', 'other', 'carry', ['forearms', 'upper_back'], ['abs', 'glutes']],
 ]
@@ -330,9 +332,14 @@ function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSee
   }))
 }
 
+/** Renamed exercises keep the ID of their original name so logged history stays linked. */
+const ID_NAMES: Record<string, string> = {
+  "Farmer's Walk": "Farmer's Carry",
+}
+
 export const EXERCISES: readonly ExerciseSeed[] = [
   ...build(COMPOUND, true, 180),
   ...build(MULTI, true, 120),
   ...build(ISOLATION, false, 90),
   ...build(CORE, false, 60),
-]
+].map((e) => (ID_NAMES[e.name] ? { ...e, idName: ID_NAMES[e.name] } : e))

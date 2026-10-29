@@ -6,7 +6,7 @@ export function ProgressScreen() {
     <>
       <PageTitle>Progress</PageTitle>
       <ComingSoon phase="Phase 5">
-        Volume per muscle, e1RM trends, PRs, heatmaps and consistency charts.
+        Volume per muscle, e1RM trends, PBs, heatmaps and consistency charts.
       </ComingSoon>
     </>
   )

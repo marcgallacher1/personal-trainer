@@ -87,7 +87,7 @@ insert into public.exercises (id, user_id, name, equipment, pattern, is_compound
   ('6478950b-96dc-502c-b5f3-9eabf1c1ade4', null, 'Step-Up', 'dumbbell', 'lunge', true, false, 120),
   ('ba7b57d6-469a-5ac2-a5f2-2deaf70a93ee', null, 'Smith Machine Split Squat', 'smith', 'lunge', true, false, 120),
   ('bb13638a-9ff9-56a9-88c4-8f9d46347cc9', null, 'Lateral Lunge', 'dumbbell', 'lunge', true, false, 120),
-  ('6cc2c62d-c3d8-5c7d-aed2-019a15aa7f74', null, 'Farmer''s Carry', 'dumbbell', 'carry', true, false, 120),
+  ('6cc2c62d-c3d8-5c7d-aed2-019a15aa7f74', null, 'Farmer''s Walk', 'dumbbell', 'carry', true, false, 120),
   ('8e985ba1-6084-5d57-aa67-8c3ef063dae7', null, 'Suitcase Carry', 'dumbbell', 'carry', true, false, 120),
   ('2da3e3b2-f8c6-5f40-b007-ca1c48bf9e89', null, 'Trap Bar Carry', 'other', 'carry', true, false, 120),
   ('ab2ebaa5-3314-5d6e-b209-7f95846090fd', null, 'Dumbbell Fly', 'dumbbell', 'isolation', false, false, 90),

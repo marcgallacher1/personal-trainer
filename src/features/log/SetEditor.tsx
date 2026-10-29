@@ -10,13 +10,13 @@ export const SET_TYPE_INFO: Record<
   working: {
     name: 'Working',
     short: '',
-    hint: 'A normal set. Counts towards progress, volume and PRs.',
+    hint: 'A normal set. Counts towards progress, volume and PBs.',
     pill: '',
   },
   warmup: {
     name: 'Warm-up',
     short: 'Warm-up',
-    hint: 'Lighter prep set. Not counted in volume or PRs.',
+    hint: 'Lighter prep set. Not counted in volume or PBs.',
     pill: 'bg-amber-400/20 text-amber-600 dark:text-amber-400',
   },
   drop: {

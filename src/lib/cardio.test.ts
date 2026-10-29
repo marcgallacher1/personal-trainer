@@ -33,6 +33,7 @@ describe('cardioTotals', () => {
 describe('cardioName', () => {
   it('labels known and unknown activities', () => {
     expect(cardioName('stairs')).toBe('Stair climber')
-    expect(cardioName('skipping')).toBe('skipping')
+    expect(cardioName('elliptical')).toBe('Cross-trainer')
+    expect(cardioName('parkour')).toBe('parkour')
   })
 })

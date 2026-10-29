@@ -148,7 +148,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                     <span className="text-lg font-semibold tabular-nums">
                       {s.reps}
                       {s.is_pr && (
-                        <span className="ml-2" aria-label="Personal record">
+                        <span className="ml-2" aria-label="Personal best">
                           🏆
                         </span>
                       )}

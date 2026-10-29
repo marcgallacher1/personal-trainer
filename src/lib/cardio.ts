@@ -1,13 +1,30 @@
-export const CARDIO_ACTIVITIES = [
-  'run',
-  'walk',
-  'cycle',
-  'row',
-  'elliptical',
+/** Shown as big tiles. 'other' opens the gym list below. */
+export const CARDIO_MAIN = ['run', 'walk', 'cycle', 'swim'] as const
+
+/** Behind "Other": gym machines first, then workouts/classes, then a catch-all. */
+export const CARDIO_GYM_MACHINES = [
   'stairs',
-  'swim',
+  'ski_erg',
+  'exercise_bike',
+  'air_bike',
+  'elliptical',
+  'row',
+] as const
+export const CARDIO_GYM_CLASSES = [
+  'spin',
   'hiit',
+  'sled',
+  'battle_ropes',
+  'skipping',
+  'boxing',
+  'hike',
   'other',
+] as const
+
+export const CARDIO_ACTIVITIES = [
+  ...CARDIO_MAIN,
+  ...CARDIO_GYM_MACHINES,
+  ...CARDIO_GYM_CLASSES,
 ] as const
 export type CardioActivity = (typeof CARDIO_ACTIVITIES)[number]
 
@@ -15,13 +32,25 @@ export const CARDIO_LABELS: Record<CardioActivity, { name: string; emoji: string
   run: { name: 'Running', emoji: '🏃' },
   walk: { name: 'Walking', emoji: '🚶' },
   cycle: { name: 'Cycling', emoji: '🚴' },
-  row: { name: 'Rowing', emoji: '🚣' },
-  elliptical: { name: 'Elliptical', emoji: '⭕' },
-  stairs: { name: 'Stair climber', emoji: '🪜' },
   swim: { name: 'Swimming', emoji: '🏊' },
+  stairs: { name: 'Stair climber', emoji: '🪜' },
+  ski_erg: { name: 'Ski erg', emoji: '⛷️' },
+  exercise_bike: { name: 'Exercise bike', emoji: '🚲' },
+  air_bike: { name: 'Air / assault bike', emoji: '💨' },
+  // id kept as 'elliptical' for existing data; UK gyms call it a cross-trainer
+  elliptical: { name: 'Cross-trainer', emoji: '🔄' },
+  row: { name: 'Rowing machine', emoji: '🚣' },
+  spin: { name: 'Spin class', emoji: '🚴' },
   hiit: { name: 'HIIT', emoji: '⚡' },
-  other: { name: 'Other', emoji: '❤️' },
+  sled: { name: 'Sled push / pull', emoji: '🛷' },
+  battle_ropes: { name: 'Battle ropes', emoji: '🪢' },
+  skipping: { name: 'Skipping', emoji: '🪢' },
+  boxing: { name: 'Boxing / bag work', emoji: '🥊' },
+  hike: { name: 'Hiking', emoji: '🥾' },
+  other: { name: 'Something else', emoji: '❤️' },
 }
+
+export const isMainCardio = (a: string): boolean => (CARDIO_MAIN as readonly string[]).includes(a)
 
 export interface CardioLike {
   activity: string

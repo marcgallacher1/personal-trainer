@@ -22,15 +22,15 @@ const lines: string[] = [
   'insert into public.exercises (id, user_id, name, equipment, pattern, is_compound, is_custom, default_rest_seconds) values',
   EXERCISES.map(
     (e) =>
-      `  (${q(seedExerciseId(e.name))}, null, ${q(e.name)}, ${q(e.equipment)}, ${q(e.pattern)}, ${e.compound}, false, ${e.restSeconds})`,
+      `  (${q(seedExerciseId(e.idName ?? e.name))}, null, ${q(e.name)}, ${q(e.equipment)}, ${q(e.pattern)}, ${e.compound}, false, ${e.restSeconds})`,
   ).join(',\n') +
     '\non conflict (id) do update set name = excluded.name, equipment = excluded.equipment, pattern = excluded.pattern,' +
     ' is_compound = excluded.is_compound, default_rest_seconds = excluded.default_rest_seconds;',
   '',
   'insert into public.exercise_muscles (exercise_id, muscle_id, user_id, weight) values',
   EXERCISES.flatMap((e) => [
-    ...e.primary.map((m) => `  (${q(seedExerciseId(e.name))}, ${q(m)}, null, 1.0)`),
-    ...e.secondary.map((m) => `  (${q(seedExerciseId(e.name))}, ${q(m)}, null, 0.5)`),
+    ...e.primary.map((m) => `  (${q(seedExerciseId(e.idName ?? e.name))}, ${q(m)}, null, 1.0)`),
+    ...e.secondary.map((m) => `  (${q(seedExerciseId(e.idName ?? e.name))}, ${q(m)}, null, 0.5)`),
   ]).join(',\n') + '\non conflict (exercise_id, muscle_id) do update set weight = excluded.weight;',
   '',
 ]
