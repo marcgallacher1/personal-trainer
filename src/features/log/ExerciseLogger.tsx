@@ -9,7 +9,7 @@ import {
   type SetRow,
 } from '../../db/queries'
 import { describePR } from '../../lib/logging/pr'
-import { nextDraft, previousPerformance, remainingDrafts } from '../../lib/logging/previous'
+import { nextDraft, previousPerformance } from '../../lib/logging/previous'
 import {
   asLogType,
   columnHeadings,
@@ -55,8 +55,9 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
 
   const logged = sets.map(asLogged)
   const previous = history ? previousPerformance(history.map(asLogged), se.session_id) : null
-  const drafts = remainingDrafts(previous, logged)
-  const draft = drafts[0] ?? nextDraft(previous, logged)
+  // Each workout starts from blank; within a workout the next set copies the last one logged.
+  // (Last time's numbers are shown for reference only, never prefilled.)
+  const draft = nextDraft(null, logged)
   const numbers = setNumbers(logged.map((s) => s.set_type))
   const nextNumber = numbers.filter(Boolean).length + 1
   const editing = sets.find((s) => s.id === editingSetId)
@@ -237,16 +238,6 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
             secondaryLabel="Log & close"
             onSecondary={(v) => void submitNew(v, true)}
           />
-        )}
-
-        {drafts.length > 1 && !editing && (
-          <p className="-mt-2 px-1 text-sm text-muted">
-            Still to match from last time:{' '}
-            {drafts
-              .slice(1)
-              .map((d) => formatSet(d, logType))
-              .join(', ')}
-          </p>
         )}
 
         {/* Notes */}

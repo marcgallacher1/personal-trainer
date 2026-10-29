@@ -17,7 +17,7 @@ export function showToast(t: Omit<ToastData, 'id' | 'tone'> & { tone?: ToastData
   current = { tone: 'default', ...t, id: ++seq }
   clearTimeout(timer)
   // Undo toasts stay long enough to tap; PB celebrations linger a bit; plain confirmations are quick.
-  timer = setTimeout(dismiss, t.action ? 5000 : t.tone === 'celebrate' ? 3500 : 2000)
+  timer = setTimeout(dismiss, t.action ? 5000 : t.tone === 'celebrate' ? 3500 : 1000)
   emit()
 }
 
