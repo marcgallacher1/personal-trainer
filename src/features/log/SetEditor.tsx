@@ -44,13 +44,26 @@ interface Props {
   heading: string
   submitLabel: string
   onSubmit: (v: EditorValue) => void
+  /** Optional second action shown left of the primary one, e.g. "Log & close" */
+  secondaryLabel?: string
+  onSecondary?: (v: EditorValue) => void
   onDelete?: () => void
   onCancel?: () => void
 }
 
 /** Roomy, labelled editor for one set. */
-export function SetEditor({ initial, heading, submitLabel, onSubmit, onDelete, onCancel }: Props) {
+export function SetEditor({
+  initial,
+  heading,
+  submitLabel,
+  onSubmit,
+  secondaryLabel,
+  onSecondary,
+  onDelete,
+  onCancel,
+}: Props) {
   const [v, setV] = useState<EditorValue>(initial)
+  const invalid = v.reps <= 0
 
   return (
     <div className="flex flex-col gap-4 rounded-3xl bg-surface p-4">
@@ -119,15 +132,27 @@ export function SetEditor({ initial, heading, submitLabel, onSubmit, onDelete, o
         </div>
       </Labelled>
 
-      <button
-        type="button"
-        disabled={v.reps <= 0}
-        className="h-14 rounded-2xl bg-accent text-lg font-bold text-accent-fg active:scale-[0.98] disabled:opacity-40"
-        onClick={() => onSubmit(v)}
-      >
-        {submitLabel}
-      </button>
-      {v.reps <= 0 && (
+      <div className="flex gap-2">
+        {secondaryLabel && onSecondary && (
+          <button
+            type="button"
+            disabled={invalid}
+            className="h-14 flex-1 rounded-2xl bg-surface-2 font-semibold active:scale-[0.98] disabled:opacity-40"
+            onClick={() => onSecondary(v)}
+          >
+            {secondaryLabel}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={invalid}
+          className="h-14 flex-[1.4] rounded-2xl bg-accent text-lg font-bold text-accent-fg active:scale-[0.98] disabled:opacity-40"
+          onClick={() => onSubmit(v)}
+        >
+          {submitLabel}
+        </button>
+      </div>
+      {invalid && (
         <p className="-mt-2 text-center text-xs text-muted">Enter your reps to log the set.</p>
       )}
 

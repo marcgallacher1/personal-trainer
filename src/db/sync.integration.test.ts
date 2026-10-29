@@ -43,9 +43,9 @@ describe('offline log → push → wipe → pull', () => {
     const s2 = await startSession()
     await addExercise(s2, bench)
     const se2 = (await db.session_exercises.where('session_id').equals(s2).toArray())[0]!
-    const prs = await logSet(se2, { weight_kg: 105, reps: 5, set_type: 'working' }, 1)
+    const { prs } = await logSet(se2, { weight_kg: 105, reps: 5, set_type: 'working' }, 1)
     expect(prs.map((p) => p.kind)).toContain('e1rm')
-    const extra = await logSet(se2, { weight_kg: 40, reps: 3, set_type: 'working' }, null)
+    const { prs: extra } = await logSet(se2, { weight_kg: 40, reps: 3, set_type: 'working' }, null)
     expect(extra).toEqual([])
     const toDelete = (await db.sets.where('session_id').equals(s2).toArray()).find(
       (s) => s.weight_kg === 40,

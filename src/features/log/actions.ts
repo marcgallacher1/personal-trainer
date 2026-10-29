@@ -108,12 +108,12 @@ export async function moveSessionExercise(
   ])
 }
 
-/** Logs a set and returns any PRs it sets (vs. every earlier set of that exercise). */
+/** Logs a set; returns its id and any PRs it sets (vs. every earlier set of that exercise). */
 export async function logSet(
   se: SessionExercise,
   draft: DraftSet,
   rir: number | null,
-): Promise<PR[]> {
+): Promise<{ id: string; prs: PR[] }> {
   const [history, today] = await Promise.all([
     db.sets.where('exercise_id').equals(se.exercise_id).toArray(),
     db.sets.where('session_id').equals(se.session_id).toArray(),
@@ -141,7 +141,7 @@ export async function logSet(
     deleted_at: null,
   }
   await saveOne('sets', row)
-  return prs
+  return { id: row.id, prs }
 }
 
 export async function updateSet(set: SetRow, patch: Partial<SetRow>): Promise<void> {

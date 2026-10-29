@@ -101,3 +101,13 @@ a {
     opacity: 1;
   }
 }
+
+@keyframes flash {
+  0%,
+  30% {
+    background-color: color-mix(in srgb, var(--color-success) 25%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}

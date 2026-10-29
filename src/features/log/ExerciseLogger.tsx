@@ -53,6 +53,8 @@ export function ExerciseLogger({
 }: Props) {
   const history = useExerciseHistory(se.exercise_id)
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
+  /** The set just logged, so we can highlight it and confirm what happened. */
+  const [justLogged, setJustLogged] = useState<{ id: string; text: string } | null>(null)
 
   const logged = sets.map(asLogged)
   const previous = history ? previousPerformance(history.map(asLogged), se.session_id) : null
@@ -62,9 +64,17 @@ export function ExerciseLogger({
   const nextNumber = numbers.filter(Boolean).length + 1
   const editing = sets.find((s) => s.id === editingSetId)
 
-  async function submitNew(v: EditorValue) {
-    const prs = await logSet(se, v, v.rir)
+  async function submitNew(v: EditorValue, close: boolean) {
+    const { id, prs } = await logSet(se, v, v.rir)
+    const label = v.set_type === 'warmup' ? 'Warm-up' : `Set ${nextNumber}`
+    const text = `${label} logged · ${kg(v.weight_kg)} kg × ${v.reps}`
     if (prs[0]) showToast({ message: describePR(prs[0]), tone: 'celebrate' })
+    if (close) {
+      if (!prs[0]) showToast({ message: `✓ ${text}` })
+      onClose()
+    } else {
+      setJustLogged({ id, text })
+    }
   }
 
   async function remove() {
@@ -126,7 +136,7 @@ export function ExerciseLogger({
                     onClick={() => setEditingSetId(s.id)}
                     className={`grid h-14 w-full grid-cols-[4.5rem_1fr_1fr_3.5rem] items-center gap-2 px-4 text-left active:bg-surface-2 ${
                       editingSetId === s.id ? 'bg-accent/10' : ''
-                    } ${i > 0 ? 'border-t border-border' : ''}`}
+                    } ${justLogged?.id === s.id ? 'animate-[flash_1.8s_ease-out]' : ''} ${i > 0 ? 'border-t border-border' : ''}`}
                   >
                     <span>
                       {type === 'working' ? (
@@ -158,8 +168,17 @@ export function ExerciseLogger({
               })}
             </div>
           )}
-          {sets.length > 0 && !editing && (
+          {sets.length > 0 && !editing && !justLogged && (
             <p className="mt-1.5 text-xs text-muted">Tap a set to edit or delete it.</p>
+          )}
+          {justLogged && !editing && (
+            <p
+              key={justLogged.id}
+              role="status"
+              className="mt-2 animate-[pop_300ms_ease-out] rounded-xl bg-success/15 px-3 py-2 text-sm font-semibold text-success"
+            >
+              ✓ {justLogged.text}. Next set is ready below.
+            </p>
           )}
         </section>
 
@@ -200,8 +219,10 @@ export function ExerciseLogger({
             key={`next-${sets.length}-${previous?.sessionId ?? 'none'}`}
             heading={draft.set_type === 'warmup' ? 'Next: warm-up set' : `Next: set ${nextNumber}`}
             initial={{ ...draft, rir: null }}
-            submitLabel="Log set"
-            onSubmit={(v) => void submitNew(v)}
+            submitLabel={draft.set_type === 'warmup' ? 'Log warm-up' : `Log set ${nextNumber}`}
+            onSubmit={(v) => void submitNew(v, false)}
+            secondaryLabel="Log & close"
+            onSecondary={(v) => void submitNew(v, true)}
           />
         )}
 
