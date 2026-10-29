@@ -64,13 +64,17 @@ new window at the deep link.
 
 ## Plans
 
-A **plan** is one type of workout (Push, Pull, Shoulders & arms…). Each plan has versions A, B…
-(`plan_sessions`), which contain planned exercises, which contain per-set targets. All of these are
-ordinary synced rows. Versions can be assigned to weekdays (`plan_schedule`); anything scheduled
-for today is offered first when you tap **Start plan**. There is no "active plan". Presets in
-`src/lib/plans/templates.ts` are copied into normal rows by the pure `instantiateTemplate`. Older
-mixed plans ("Push A, Pull A…") can be split into one plan per type. Version ids are kept, so
-logged workouts stay linked.
+A **plan** is your week: a set of workouts (`plan_sessions`, e.g. "Push A", "Pull A", "Arms"),
+each on one or more weekdays (`plan_schedule`). Workouts contain planned exercises, which contain
+per-set targets. All of these are ordinary synced rows. Plans are optional. At most one plan is
+active; the active plan drives Today, and switching it off is just a toggle.
+
+**Building a plan:** the builder (`/plans/new`) shows preset workouts grouped by type (Push, Pull,
+Shoulders & arms…, from `src/lib/plans/templates.ts`) plus "Create your own". Tapping a day on a
+workout adds it to a draft plan (pure logic in `src/lib/plans/draft.ts`, kept in
+`sessionStorage` until saved). **Save plan** copies each chosen workout into the plan as a normal,
+fully editable workout (`instantiateWorkout`). On a saved plan, `/plans/:id/add` uses the same
+screen but writes straight to the plan.
 
 **Version history:** when you leave a plan screen, the plan's live rows are snapshotted into
 `plan_versions`, but only if they differ from the latest version. The comparison ignores key order

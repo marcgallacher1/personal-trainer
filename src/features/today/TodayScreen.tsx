@@ -4,7 +4,6 @@ import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { useActiveSession, useSessionSummaries } from '../../db/queries'
 import { isoWeekday, weekProgress, weekStart, type WorkoutRef } from '../../lib/plans/schedule'
-import { versionTitle } from '../../lib/plans/templates'
 import { startSession } from '../log/actions'
 import { formatDuration, londonDate, sessionTitle } from '../log/format'
 import { startFromPlan, usePlanLibrary, useProfile } from '../plans/data'
@@ -31,11 +30,14 @@ export function TodayScreen() {
   const week = weekProgress(workouts, today, profile?.sessions_per_week ?? 4)
   const last = summaries?.find((s) => s.session.ended_at !== null)
   const trainedToday = workouts.some((w) => w.day === today && w.active)
-  const scheduled = (library ?? []).flatMap((p) =>
-    p.versions
-      .filter((v) => p.schedule.some((s) => s.plan_session_id === v.id && s.weekday === weekday))
-      .map((v) => ({ plan: p.plan, version: v })),
-  )
+  // Only the active plan drives Today; no active plan = just log freely
+  const scheduled = (library ?? [])
+    .filter((p) => p.plan.is_active)
+    .flatMap((p) =>
+      p.versions
+        .filter((v) => p.schedule.some((s) => s.plan_session_id === v.id && s.weekday === weekday))
+        .map((v) => ({ plan: p.plan, version: v })),
+    )
 
   async function go(start: () => Promise<string>) {
     const id = await start()
@@ -78,11 +80,9 @@ export function TodayScreen() {
                   <span className="text-3xl">{version.emoji ?? '🏋️'}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-semibold tracking-wide text-accent uppercase">
-                      Scheduled for {WEEKDAYS[weekday - 1]}
+                      {plan.name} · {WEEKDAYS[weekday - 1]}
                     </span>
-                    <span className="block text-xl font-bold">
-                      Start {versionTitle(plan.name, version.name)}
-                    </span>
+                    <span className="block text-xl font-bold">Start {version.name}</span>
                   </span>
                   <span className="text-2xl text-accent">›</span>
                 </button>

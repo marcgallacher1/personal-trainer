@@ -1,123 +1,73 @@
-import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate } from 'react-router'
 import { PageTitle } from '../../app/Layout'
-import { Sheet } from '../../components/Sheet'
-import { showToast } from '../../components/Toast'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { Button } from '../../components/Button'
 import { db } from '../../db/local'
-import type { PlanSessionRow } from '../../lib/plans/instantiate'
-import { splitByCategory, TEMPLATES, type PlanTemplate } from '../../lib/plans/templates'
-import { canSplit, createBlankPlan, createPlanFromTemplate, splitPlan, usePlans } from './data'
+import { weekSummary } from '../../lib/plans/draft'
+import { usePlans } from './data'
 
 export function PlansScreen() {
   const navigate = useNavigate()
   const plans = usePlans()
-  const [creating, setCreating] = useState(false)
-  const [customName, setCustomName] = useState('')
-  const versionsByPlan = useLiveQuery(async () => {
-    const map = new Map<string, PlanSessionRow[]>()
-    for (const s of await db.plan_sessions.toArray()) {
+  // Per plan: its workouts with their days, for the one-line week summary
+  const weeks = useLiveQuery(async () => {
+    const [sessions, schedule] = await Promise.all([
+      db.plan_sessions.toArray(),
+      db.plan_schedule.toArray(),
+    ])
+    const out = new Map<string, { title: string; weekdays: number[] }[]>()
+    for (const s of sessions) {
       if (s.deleted_at) continue
-      map.set(
-        s.plan_id,
-        [...(map.get(s.plan_id) ?? []), s].toSorted((a, b) => a.order - b.order),
-      )
+      const weekdays = schedule
+        .filter((d) => !d.deleted_at && d.plan_session_id === s.id && d.weekday !== null)
+        .map((d) => d.weekday!)
+      out.set(s.plan_id, [...(out.get(s.plan_id) ?? []), { title: s.name, weekdays }])
     }
-    return map
+    return out
   }, [])
 
-  async function fromTemplate(t: PlanTemplate) {
-    setCreating(false)
-    const id = await createPlanFromTemplate(t)
-    void navigate(`/plans/${id}`)
-  }
-
-  async function custom() {
-    const name = customName.trim()
-    if (!name) return
-    setCreating(false)
-    setCustomName('')
-    const id = await createBlankPlan(name)
-    void navigate(`/plans/${id}`)
-  }
-
-  const visible = (plans ?? []).filter((p) => !p.archived)
+  const visible = (plans ?? [])
+    .filter((p) => !p.archived)
+    .toSorted((a, b) => Number(b.is_active) - Number(a.is_active))
   const archived = (plans ?? []).filter((p) => p.archived)
-  const existingNames = new Set(visible.map((p) => p.name.toLowerCase()))
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-end justify-between">
-        <PageTitle>Plans</PageTitle>
-        <button
-          type="button"
-          className="mb-4 text-sm font-semibold text-accent"
-          onClick={() => setCreating(true)}
-        >
-          + New plan
-        </button>
-      </div>
-      <p className="-mt-3 text-sm text-muted">
-        Each plan is a type of workout (Push, Pull, Legs…) with versions A, B… Start one from the
-        Today screen.
+      <PageTitle>Plans</PageTitle>
+
+      <Button className="h-16 text-xl" onClick={() => void navigate('/plans/new')}>
+        Start new plan
+      </Button>
+      <p className="-mt-2 text-center text-xs text-muted">
+        Plans are optional — you can always just log workouts as you go.
       </p>
 
-      {plans && visible.length === 0 && (
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="rounded-3xl bg-accent p-5 text-left text-accent-fg"
-        >
-          <p className="text-xl font-bold">Create your first plan</p>
-          <p className="mt-1 text-sm opacity-90">
-            Start from Push, Pull, Shoulders & arms, Back & arms… or make your own.
-          </p>
-        </button>
-      )}
-
       {visible.map((p) => {
-        const versions = versionsByPlan?.get(p.id) ?? []
-        const mixed = canSplit(versions)
+        const items = weeks?.get(p.id) ?? []
+        const summary = weekSummary(items)
         return (
-          <div key={p.id} className="rounded-2xl bg-surface">
-            <Link to={`/plans/${p.id}`} className="flex items-center gap-3 p-4">
-              <span className="text-2xl">{versions[0]?.emoji ?? '🏋️'}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-lg font-bold">{p.name}</span>
-                <span className="block truncate text-sm text-muted">
-                  {mixed
-                    ? versions.map((v) => v.name).join(' · ')
-                    : `${versions.length} version${versions.length === 1 ? '' : 's'}${
-                        versions.length ? `: ${versions.map((v) => v.name).join(', ')}` : ''
-                      }`}
+          <Link
+            key={p.id}
+            to={`/plans/${p.id}`}
+            className={`block rounded-2xl p-4 active:opacity-80 ${
+              p.is_active ? 'bg-accent/10 ring-2 ring-accent' : 'bg-surface'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-lg font-bold">{p.name}</p>
+              {p.is_active && (
+                <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-fg">
+                  ACTIVE
                 </span>
-              </span>
-              <span className="text-2xl text-muted">›</span>
-            </Link>
-            {mixed && (
-              <div className="border-t border-border p-4">
-                <p className="text-sm">
-                  This plan mixes workout types. Split it into{' '}
-                  <b>
-                    {splitByCategory(versions)
-                      .map((g) => g.category)
-                      .join(', ')}
-                  </b>
-                  ? Your logged workouts stay linked.
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 h-11 w-full rounded-xl bg-accent font-bold text-accent-fg"
-                  onClick={async () => {
-                    const ids = await splitPlan(p)
-                    showToast({ message: `Split into ${ids.length} plans` })
-                  }}
-                >
-                  Split it up
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+            <p className="text-sm text-muted">
+              {summary ||
+                (items.length
+                  ? `${items.length} workout${items.length === 1 ? '' : 's'}, no days set`
+                  : 'No workouts yet')}
+            </p>
+          </Link>
         )
       })}
 
@@ -137,67 +87,6 @@ export function PlansScreen() {
           ))}
         </section>
       )}
-
-      <Sheet
-        open={creating}
-        title="New plan"
-        subtitle="Starts with exercises you can change, or make your own."
-        closeLabel="Cancel"
-        onClose={() => setCreating(false)}
-      >
-        <div className="flex flex-col gap-3">
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void custom()
-            }}
-          >
-            <input
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              placeholder="Your own, e.g. Arms"
-              className="h-12 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={!customName.trim()}
-              className="h-12 rounded-xl bg-accent px-4 font-bold text-accent-fg disabled:opacity-40"
-            >
-              Create
-            </button>
-          </form>
-
-          <h3 className="mt-2 text-xs font-semibold tracking-wide text-muted uppercase">
-            Or start from
-          </h3>
-          {[...TEMPLATES]
-            .toSorted((a, b) => Number(Boolean(b.suggested)) - Number(Boolean(a.suggested)))
-            .map((t) => {
-              const exists = existingNames.has(t.name.toLowerCase())
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => void fromTemplate(t)}
-                  className={`rounded-2xl p-4 text-left ${t.suggested ? 'bg-accent/10' : 'bg-surface'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-lg font-bold">
-                      {t.sessions[0]?.emoji} {t.name}
-                    </p>
-                    {exists && <span className="text-xs text-muted">you have this</span>}
-                  </div>
-                  <p className="text-sm text-muted">{t.description}</p>
-                  <p className="mt-1 text-xs text-muted">
-                    Versions: {t.sessions.map((s) => s.name).join(', ')}
-                    {t.suggested ? ' · suits your upper-body focus' : ''}
-                  </p>
-                </button>
-              )
-            })}
-        </div>
-      </Sheet>
     </div>
   )
 }

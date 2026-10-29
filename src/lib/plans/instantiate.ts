@@ -1,5 +1,5 @@
 import type { Tables } from '../../db/database.types'
-import type { PlanTemplate } from './templates'
+import type { TemplateSession } from './templates'
 
 export type PlanRow = Tables<'plans'>
 export type PlanSessionRow = Tables<'plan_sessions'>
@@ -116,79 +116,86 @@ export function newTargetRow(
   }
 }
 
-/** Copies a template into fresh plan rows. Unknown exercise names are skipped (reported back). */
-export function instantiateTemplate(
-  template: PlanTemplate,
+export function newScheduleRow(
+  ctx: Ctx,
+  planId: string,
+  sessionId: string,
+  weekday: number,
+): PlanScheduleRow {
+  return {
+    ...meta(ctx),
+    id: ctx.newId(),
+    plan_id: planId,
+    plan_session_id: sessionId,
+    weekday,
+    rotation_index: null,
+    planned_time: null,
+    tz: 'Europe/London',
+    week_of_block: null,
+  }
+}
+
+export interface WorkoutRows {
+  session: PlanSessionRow
+  exercises: PlanExerciseRow[]
+  targets: PlanSetTargetRow[]
+  /** Template exercise names not found in the catalogue (skipped) */
+  missing: string[]
+}
+
+/**
+ * Copies one preset workout (or an empty custom one) into a plan as a fully editable workout.
+ * Unknown exercise names are skipped and reported back.
+ */
+export function instantiateWorkout(
+  preset: TemplateSession | null,
+  planId: string,
+  title: string,
+  order: number,
   exerciseIdByName: ReadonlyMap<string, string>,
   ctx: Ctx,
-): PlanRows & { missing: string[] } {
-  const plan = newPlanRow(ctx, template.name, template.scheduleMode)
-  const rows: PlanRows & { missing: string[] } = {
-    plan,
-    sessions: [],
-    schedule: [],
-    exercises: [],
-    targets: [],
-    missing: [],
+): WorkoutRows {
+  const session = newSessionRow(ctx, planId, title, order, preset?.emoji ?? null)
+  session.notes = preset?.description ?? null
+  const out: WorkoutRows = { session, exercises: [], targets: [], missing: [] }
+  if (!preset) return out
+
+  const groupIds = new Map<string, string>()
+  const groupSizes = new Map<string, number>()
+  for (const te of preset.exercises) {
+    if (te.superset) groupSizes.set(te.superset, (groupSizes.get(te.superset) ?? 0) + 1)
   }
 
-  template.sessions.forEach((ts, sIdx) => {
-    const session = newSessionRow(ctx, plan.id, ts.name, sIdx, ts.emoji)
-    session.notes = ts.description
-    rows.sessions.push(session)
-
-    for (const weekday of ts.weekdays ?? []) {
-      rows.schedule.push({
-        ...meta(ctx),
-        id: ctx.newId(),
-        plan_id: plan.id,
-        plan_session_id: session.id,
-        weekday,
-        rotation_index: null,
-        planned_time: null,
-        tz: 'Europe/London',
-        week_of_block: null,
-      })
+  let n = 0
+  for (const te of preset.exercises) {
+    const exerciseId = exerciseIdByName.get(te.name)
+    if (!exerciseId) {
+      out.missing.push(te.name)
+      continue
     }
-
-    const groupIds = new Map<string, string>()
-    const groupSizes = new Map<string, number>()
-    for (const te of ts.exercises) {
-      if (te.superset) groupSizes.set(te.superset, (groupSizes.get(te.superset) ?? 0) + 1)
+    const pe = newPlanExerciseRow(ctx, session.id, exerciseId, n++)
+    if (te.superset) {
+      if (!groupIds.has(te.superset)) groupIds.set(te.superset, ctx.newId())
+      pe.group_id = groupIds.get(te.superset)!
+      pe.group_type = (groupSizes.get(te.superset) ?? 0) >= 3 ? 'giant' : 'superset'
     }
+    pe.alternatives = (te.alternatives ?? [])
+      .map((name) => exerciseIdByName.get(name))
+      .filter((id): id is string => Boolean(id))
+    out.exercises.push(pe)
 
-    let order = 0
-    for (const te of ts.exercises) {
-      const exerciseId = exerciseIdByName.get(te.name)
-      if (!exerciseId) {
-        rows.missing.push(te.name)
-        continue
-      }
-      const pe = newPlanExerciseRow(ctx, session.id, exerciseId, order++)
-      if (te.superset) {
-        if (!groupIds.has(te.superset)) groupIds.set(te.superset, ctx.newId())
-        pe.group_id = groupIds.get(te.superset)!
-        pe.group_type = (groupSizes.get(te.superset) ?? 0) >= 3 ? 'giant' : 'superset'
-      }
-      pe.alternatives = (te.alternatives ?? [])
-        .map((n) => exerciseIdByName.get(n))
-        .filter((id): id is string => Boolean(id))
-      rows.exercises.push(pe)
-
-      for (let i = 0; i < te.sets; i++) {
-        rows.targets.push(
-          newTargetRow(ctx, pe.id, i, {
-            set_type: 'working',
-            reps_min: te.min,
-            reps_max: te.max,
-            seconds_min: null,
-            seconds_max: null,
-            target_rir: te.rir,
-          }),
-        )
-      }
+    for (let i = 0; i < te.sets; i++) {
+      out.targets.push(
+        newTargetRow(ctx, pe.id, i, {
+          set_type: 'working',
+          reps_min: te.min,
+          reps_max: te.max,
+          seconds_min: null,
+          seconds_max: null,
+          target_rir: te.rir,
+        }),
+      )
     }
-  })
-
-  return rows
+  }
+  return out
 }

@@ -6,10 +6,16 @@ import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, save, saveOne, type Change } from '../../db/write'
 import { isTimed, type LogType } from '../../lib/logging/types'
 import {
-  instantiateTemplate,
+  buildPlanFromDraft,
+  presetFor,
+  titleFor,
+  type DraftItem,
+  type WorkoutSource,
+} from '../../lib/plans/draft'
+import {
+  instantiateWorkout,
   newPlanExerciseRow,
-  newPlanRow,
-  newSessionRow,
+  newScheduleRow,
   newTargetRow,
   type Ctx,
   type PlanExerciseRow,
@@ -27,12 +33,6 @@ import {
   snapshotToJson,
 } from '../../lib/plans/snapshot'
 import { quickSets, type TargetLike } from '../../lib/plans/targets'
-import {
-  nextVersionName,
-  splitByCategory,
-  versionTitle,
-  type PlanTemplate,
-} from '../../lib/plans/templates'
 
 export type PlanVersionRow = Tables<'plan_versions'>
 export type Profile = Tables<'profiles'>
@@ -171,70 +171,91 @@ const insertAll = (rows: PlanRows): Change[] => [
   ...rows.targets.map((row) => ({ table: 'plan_set_targets' as const, row })),
 ]
 
-export async function createPlanFromTemplate(template: PlanTemplate): Promise<string> {
+async function exerciseIdsByName(): Promise<Map<string, string>> {
   const exercises = (await db.exercises.toArray()).filter(live)
-  const byName = new Map(exercises.map((e) => [e.name, e.id]))
-  const rows = instantiateTemplate(template, byName, ctx())
-  await save(insertAll(rows))
-  await snapshotIfChanged(rows.plan.id, 'Created from template')
-  return rows.plan.id
+  return new Map(exercises.map((e) => [e.name, e.id]))
 }
 
-/** A new plan (workout type) with an empty version A. */
-export async function createBlankPlan(name: string): Promise<string> {
-  const c = ctx()
-  const plan = newPlanRow(c, name, 'weekday')
-  const session = newSessionRow(c, plan.id, 'A', 0)
-  await save([
-    { table: 'plans', row: plan },
-    { table: 'plan_sessions', row: session },
-  ])
-  await snapshotIfChanged(plan.id, 'Created')
-  return plan.id
+/** Saves a plan built with the plan builder. Optionally makes it the active plan. */
+export async function savePlanFromDraft(
+  name: string,
+  draft: readonly DraftItem[],
+  makeActive: boolean,
+): Promise<string> {
+  const rows = buildPlanFromDraft(name, draft, await exerciseIdsByName(), ctx())
+  await save(insertAll(rows))
+  if (makeActive) await setPlanActive(rows.plan, true)
+  await snapshotIfChanged(rows.plan.id, 'Created')
+  return rows.plan.id
 }
 
 export async function updatePlan(plan: PlanRow, patch: Partial<PlanRow>): Promise<void> {
   await saveOne('plans', { ...plan, ...patch })
 }
 
+/**
+ * Turns a plan on or off. Only one plan is active at a time (switching one on switches the
+ * others off). Having no active plan is fine — you can just log workouts as you go.
+ */
+export async function setPlanActive(plan: PlanRow, active: boolean): Promise<void> {
+  const fresh = (await db.plans.get(plan.id)) ?? plan
+  if (!active) {
+    await updatePlan(fresh, { is_active: false })
+    return
+  }
+  const others = (await db.plans.toArray()).filter((p) => p.is_active && p.id !== plan.id)
+  await save([
+    // Deactivations first: the database allows one active plan per user
+    ...others.map((p) => ({ table: 'plans' as const, row: { ...p, is_active: false } })),
+    { table: 'plans', row: { ...fresh, is_active: true, archived: false } },
+  ])
+}
+
 export async function archivePlan(plan: PlanRow, archived: boolean): Promise<void> {
   await updatePlan(plan, { archived, is_active: false })
 }
 
-/** True when a plan mixes workout types ("Push A", "Pull A"…) and could be split up. */
-export function canSplit(sessions: readonly PlanSessionRow[]): boolean {
-  return splitByCategory(sessions).length > 1
-}
-
 /**
- * Splits a mixed plan into one plan per workout type ("Push A, Push B" → plan "Push", versions A/B).
- * Sessions keep their ids (so logged workouts stay linked); they just move to the new plans.
+ * Plan builder on an existing plan: tap a day for a workout. Adds the workout (copied from the
+ * preset, or empty for your own) if it isn't in the plan yet, otherwise toggles that day.
  */
-export async function splitPlan(plan: PlanRow): Promise<string[]> {
-  const rows = await loadPlanRows(plan.id)
-  if (!rows) return []
+export async function togglePlanDay(
+  planId: string,
+  source: WorkoutSource,
+  weekday: number,
+): Promise<'added' | 'removed'> {
+  const rows = await loadPlanRows(planId)
+  if (!rows) throw new Error('Plan not found')
+  const title = titleFor(source)
+  const existing = rows.sessions.find((s) => s.name.toLowerCase() === title.toLowerCase())
   const c = ctx()
-  const changes: Change[] = []
-  const created: string[] = []
-  for (const group of splitByCategory(rows.sessions)) {
-    const target = newPlanRow(c, group.category, 'weekday')
-    created.push(target.id)
-    changes.push({ table: 'plans', row: target })
-    group.sessions.forEach((g, order) => {
-      const s = rows.sessions.find((x) => x.id === g.id)!
-      changes.push({
-        table: 'plan_sessions',
-        row: { ...s, plan_id: target.id, name: g.version, order },
-      })
-      for (const sch of rows.schedule.filter((x) => x.plan_session_id === s.id)) {
-        changes.push({ table: 'plan_schedule', row: { ...sch, plan_id: target.id } })
-      }
-    })
+  if (existing) {
+    const day = rows.schedule.find(
+      (s) => s.plan_session_id === existing.id && s.weekday === weekday,
+    )
+    if (day) {
+      await save([deletion('plan_schedule', day)])
+      return 'removed'
+    }
+    await saveOne('plan_schedule', newScheduleRow(c, planId, existing.id, weekday))
+    return 'added'
   }
-  changes.push(deletion('plans', { ...plan, is_active: false }))
-  await save(changes)
-  for (const id of created) await snapshotIfChanged(id, `Split from ${plan.name}`)
-  return created
+  const order = Math.max(-1, ...rows.sessions.map((s) => s.order)) + 1
+  const w = instantiateWorkout(
+    presetFor(source),
+    planId,
+    title,
+    order,
+    await exerciseIdsByName(),
+    c,
+  )
+  await save([
+    { table: 'plan_sessions', row: w.session },
+    ...w.exercises.map((row) => ({ table: 'plan_exercises' as const, row })),
+    ...w.targets.map((row) => ({ table: 'plan_set_targets' as const, row })),
+    { table: 'plan_schedule', row: newScheduleRow(c, planId, w.session.id, weekday) },
+  ])
+  return 'added'
 }
 
 export async function deletePlan(plan: PlanRow): Promise<Change[]> {
@@ -307,15 +328,6 @@ export async function duplicatePlan(plan: PlanRow): Promise<string> {
 // Sessions & schedule
 // ---------------------------------------------------------------------------
 
-/** Adds the next version (A, B, C…) to a plan. */
-export async function addVersion(planId: string): Promise<string> {
-  const existing = (await db.plan_sessions.where('plan_id').equals(planId).toArray()).filter(live)
-  const name = nextVersionName(existing.map((s) => s.name))
-  const row = newSessionRow(ctx(), planId, name, Math.max(-1, ...existing.map((s) => s.order)) + 1)
-  await saveOne('plan_sessions', row)
-  return row.id
-}
-
 export async function updatePlanSession(
   s: PlanSessionRow,
   patch: Partial<PlanSessionRow>,
@@ -373,21 +385,7 @@ export async function toggleWeekday(
     await save([deletion('plan_schedule', existing)])
     return
   }
-  const c = ctx()
-  await saveOne('plan_schedule', {
-    id: c.newId(),
-    user_id: c.userId,
-    plan_id: planId,
-    plan_session_id: sessionId,
-    weekday,
-    rotation_index: null,
-    planned_time: null,
-    tz: 'Europe/London',
-    week_of_block: null,
-    created_at: c.now,
-    updated_at: c.now,
-    deleted_at: null,
-  })
+  await saveOne('plan_schedule', newScheduleRow(ctx(), planId, sessionId, weekday))
 }
 
 // ---------------------------------------------------------------------------
@@ -554,10 +552,9 @@ export async function restoreVersion(v: PlanVersionRow): Promise<void> {
 // Workouts from plans, and edits made during a workout
 // ---------------------------------------------------------------------------
 
-/** Starts a workout pre-loaded with a plan version's exercises; named e.g. "Push A". */
+/** Starts a workout pre-loaded with a planned workout's exercises (sets stay blank). */
 export async function startFromPlan(planSession: PlanSessionRow): Promise<string> {
   const c = ctx()
-  const plan = await db.plans.get(planSession.plan_id)
   const exercises = (
     await db.plan_exercises.where('plan_session_id').equals(planSession.id).toArray()
   )
@@ -568,7 +565,7 @@ export async function startFromPlan(planSession: PlanSessionRow): Promise<string
     user_id: c.userId,
     plan_id: planSession.plan_id,
     plan_session_id: planSession.id,
-    name: plan ? versionTitle(plan.name, planSession.name) : planSession.name,
+    name: planSession.name,
     started_at: c.now,
     ended_at: null,
     notes: null,

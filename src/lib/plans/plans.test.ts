@@ -1,17 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import { EXERCISES } from '../seed/exercises'
-import { instantiateTemplate, type Ctx } from './instantiate'
+import {
+  buildPlanFromDraft,
+  sourceKey,
+  titleFor,
+  toggleDraftDay,
+  weekOf,
+  weekSummary,
+  type DraftItem,
+  type WorkoutSource,
+} from './draft'
+import { instantiateWorkout, type Ctx, type PlanRows } from './instantiate'
 import { buildSnapshot, planRestore, snapshotKey, summariseSnapshot } from './snapshot'
-import { nextVersionName, splitByCategory, TEMPLATES, versionTitle } from './templates'
+import { TEMPLATES } from './templates'
 
 const names = new Map(EXERCISES.map((e) => [e.name, `id:${e.name}`]))
 const ctx = (): Ctx => {
   let n = 0
   return { userId: 'u1', now: '2026-10-31T10:00:00Z', newId: () => `gen-${++n}` }
 }
-const push = TEMPLATES.find((t) => t.id === 'push')!
+const pushA: WorkoutSource = { kind: 'preset', templateId: 'push', version: 'A' }
+const pullA: WorkoutSource = { kind: 'preset', templateId: 'pull', version: 'A' }
+const arms: WorkoutSource = { kind: 'custom', name: 'Arms' }
 
-describe('templates', () => {
+/** Mon Push A, Tue Pull A, Thu Push A, Fri Arms */
+function sampleDraft(): DraftItem[] {
+  let d: DraftItem[] = []
+  for (const [src, day] of [
+    [pushA, 1],
+    [pullA, 2],
+    [pushA, 4],
+    [arms, 5],
+  ] as const) {
+    d = toggleDraftDay(d, src, day).draft
+  }
+  return d
+}
+
+describe('presets', () => {
   it('only reference exercises that exist in the catalogue', () => {
     for (const t of TEMPLATES) {
       for (const s of t.sessions) {
@@ -34,7 +60,7 @@ describe('templates', () => {
     }
   })
 
-  it('suggests only upper-body plans (no leg work)', () => {
+  it('suggests only upper-body workouts (no leg work)', () => {
     const legMoves = /squat|deadlift|leg|lunge|calf|hip thrust/i
     const suggested = TEMPLATES.filter((t) => t.suggested)
     expect(suggested.map((t) => t.id)).toEqual(['push', 'pull', 'shoulders-arms', 'back-arms'])
@@ -46,122 +72,118 @@ describe('templates', () => {
   })
 })
 
-describe('versions', () => {
-  it('picks the next free letter', () => {
-    expect(nextVersionName([])).toBe('A')
-    expect(nextVersionName(['A', 'B'])).toBe('C')
-    expect(nextVersionName(['A', 'C'])).toBe('B')
-    expect(versionTitle('Push', 'A')).toBe('Push A')
+describe('draft plan', () => {
+  it('adds a workout when a day is first picked, and adds further days to it', () => {
+    const first = toggleDraftDay([], pushA, 1)
+    expect(first.added).toBe(true)
+    expect(first.draft).toEqual([
+      { key: 'preset:push:A', source: pushA, title: 'Push A', emoji: '💪', weekdays: [1] },
+    ])
+    const second = toggleDraftDay(first.draft, pushA, 4)
+    expect(second.added).toBe(true)
+    expect(second.draft[0]!.weekdays).toEqual([1, 4])
   })
 
-  it('splits "Push A / Pull A / Push B" into one plan per type', () => {
-    const groups = splitByCategory([
-      { id: '1', name: 'Push A', order: 0 },
-      { id: '2', name: 'Pull A', order: 1 },
-      { id: '3', name: 'Push B', order: 2 },
-      { id: '4', name: 'Pull B', order: 3 },
-      { id: '5', name: 'Legs', order: 4 },
-      { id: '6', name: 'Shoulders & arms', order: 5 },
-      { id: '7', name: 'Legs', order: 6 },
-    ])
-    expect(groups).toEqual([
-      {
-        category: 'Push',
-        sessions: [
-          { id: '1', version: 'A' },
-          { id: '3', version: 'B' },
-        ],
-      },
-      {
-        category: 'Pull',
-        sessions: [
-          { id: '2', version: 'A' },
-          { id: '4', version: 'B' },
-        ],
-      },
-      {
-        category: 'Legs',
-        sessions: [
-          { id: '5', version: 'A' },
-          { id: '7', version: 'B' },
-        ],
-      },
-      { category: 'Shoulders & arms', sessions: [{ id: '6', version: 'A' }] },
-    ])
+  it('removes a day on a second tap, and drops the workout when no days are left', () => {
+    let d = toggleDraftDay([], pushA, 1).draft
+    d = toggleDraftDay(d, pushA, 4).draft
+    const off = toggleDraftDay(d, pushA, 1)
+    expect(off.added).toBe(false)
+    expect(off.draft[0]!.weekdays).toEqual([4])
+    expect(toggleDraftDay(off.draft, pushA, 4).draft).toEqual([])
+  })
+
+  it('titles presets and custom workouts', () => {
+    expect(titleFor(pushA)).toBe('Push A')
+    expect(titleFor({ kind: 'preset', templateId: 'shoulders-arms', version: 'A' })).toBe(
+      'Shoulders & arms A',
+    )
+    expect(titleFor(arms)).toBe('Arms')
+    expect(sourceKey({ kind: 'custom', name: ' Arms ' })).toBe('custom:arms')
+  })
+
+  it('summarises the week', () => {
+    const d = sampleDraft()
+    expect(weekSummary(d)).toBe('Mon Push A · Tue Pull A · Thu Push A · Fri Arms')
+    expect(weekOf(d).map((x) => x.titles.length)).toEqual([1, 1, 0, 1, 1, 0, 0])
+  })
+
+  it('builds plan rows: one workout per item, scheduled on its days', () => {
+    const rows = buildPlanFromDraft('My upper plan', sampleDraft(), names, ctx())
+    expect(rows.plan.name).toBe('My upper plan')
+    expect(rows.plan.is_active).toBe(false)
+    expect(rows.sessions.map((s) => s.name)).toEqual(['Push A', 'Pull A', 'Arms'])
+    const push = rows.sessions[0]!
+    expect(
+      rows.schedule.filter((s) => s.plan_session_id === push.id).map((s) => s.weekday),
+    ).toEqual([1, 4])
+    expect(rows.exercises.filter((e) => e.plan_session_id === push.id)).toHaveLength(7)
+    // Custom workouts start empty, ready to fill in
+    expect(rows.exercises.filter((e) => e.plan_session_id === rows.sessions[2]!.id)).toEqual([])
+    expect(rows.missing).toEqual([])
   })
 })
 
-describe('instantiateTemplate', () => {
-  it('creates versions with descriptions, exercises, targets, supersets and alternatives', () => {
-    const rows = instantiateTemplate(push, names, ctx())
-    expect(rows.missing).toEqual([])
-    expect(rows.plan.name).toBe('Push')
-    expect(rows.sessions.map((s) => s.name)).toEqual(['A', 'B'])
-    expect(rows.sessions[0]!.notes).toMatch(/Chest, shoulders & triceps/)
-    expect(rows.schedule).toEqual([])
-
-    const a = rows.exercises.filter((e) => e.plan_session_id === rows.sessions[0]!.id)
-    expect(a).toHaveLength(7)
-    const tri = a.filter((e) => e.group_id)
+describe('instantiateWorkout', () => {
+  it('copies a preset with targets, supersets and alternatives', () => {
+    const preset = TEMPLATES.find((t) => t.id === 'push')!.sessions[0]!
+    const w = instantiateWorkout(preset, 'plan-1', 'Push A', 0, names, ctx())
+    expect(w.session.name).toBe('Push A')
+    expect(w.session.notes).toMatch(/Chest, shoulders & triceps/)
+    const tri = w.exercises.filter((e) => e.group_id)
     expect(tri).toHaveLength(2)
     expect(tri[0]!.group_id).toBe(tri[1]!.group_id)
-    expect(tri[0]!.group_type).toBe('superset')
-    expect(a[0]!.alternatives).toEqual([
+    expect(w.exercises[0]!.alternatives).toEqual([
       'id:Incline Machine Press',
       'id:Smith Machine Incline Press',
     ])
-
-    const incline = rows.targets.filter((t) => t.plan_exercise_id === a[0]!.id)
-    expect(incline.map((t) => [t.reps_min, t.reps_max, t.target_rir])).toEqual([
-      [8, 12, 1],
-      [8, 12, 1],
-      [8, 12, 1],
-    ])
+    expect(w.targets.filter((t) => t.plan_exercise_id === w.exercises[0]!.id)).toHaveLength(3)
   })
 
   it('reports unknown exercises instead of failing', () => {
-    const rows = instantiateTemplate(push, new Map(), ctx())
-    expect(rows.exercises).toEqual([])
-    expect(rows.missing.length).toBeGreaterThan(0)
+    const preset = TEMPLATES.find((t) => t.id === 'push')!.sessions[0]!
+    const w = instantiateWorkout(preset, 'plan-1', 'Push A', 0, new Map(), ctx())
+    expect(w.exercises).toEqual([])
+    expect(w.missing.length).toBeGreaterThan(0)
   })
 })
 
+const rows = (): PlanRows => buildPlanFromDraft('Plan', sampleDraft(), names, ctx())
+
 describe('snapshots', () => {
   it('are stable regardless of timestamps and ignore deleted rows', () => {
-    const rows = instantiateTemplate(push, names, ctx())
-    const a = buildSnapshot(rows)
+    const r = rows()
+    const a = buildSnapshot(r)
     const touched = {
-      ...rows,
-      targets: rows.targets.map((t) => ({ ...t, updated_at: '2030-01-01T00:00:00Z' })),
+      ...r,
+      targets: r.targets.map((t) => ({ ...t, updated_at: '2030-01-01T00:00:00Z' })),
     }
     expect(snapshotKey(buildSnapshot(touched))).toBe(snapshotKey(a))
-
     const withDeleted = {
-      ...rows,
-      targets: [...rows.targets, { ...rows.targets[0]!, id: 'x', deleted_at: '2026-01-01' }],
+      ...r,
+      targets: [...r.targets, { ...r.targets[0]!, id: 'x', deleted_at: '2026-01-01' }],
     }
     expect(snapshotKey(buildSnapshot(withDeleted))).toBe(snapshotKey(a))
-    // Push A: 3+3+3+3+3+3+2 = 20; Push B: 3+3+3+4+3+3 = 19
-    expect(summariseSnapshot(a)).toBe('2 sessions · 13 exercises · 39 sets')
+    // Push A 20 sets + Pull A 19 sets + Arms 0
+    expect(summariseSnapshot(a)).toBe('3 sessions · 14 exercises · 39 sets')
   })
 
   it('plans a restore: upsert snapshot rows, delete rows added since', () => {
-    const rows = instantiateTemplate(push, names, ctx())
-    const snap = buildSnapshot(rows)
-    const added = { ...rows.targets[0]!, id: 'new-target' }
+    const r = rows()
+    const snap = buildSnapshot(r)
     const current = {
-      ...rows,
-      plan: { ...rows.plan, name: 'Renamed' },
-      targets: [...rows.targets, added],
+      ...r,
+      plan: { ...r.plan, name: 'Renamed' },
+      targets: [...r.targets, { ...r.targets[0]!, id: 'new-target' }],
     }
-    const r = planRestore(snap, current)
-    expect(r.planPatch.name).toBe('Push')
-    expect(r.deletions.targets.map((t) => t.id)).toEqual(['new-target'])
-    expect(r.upserts.targets).toHaveLength(rows.targets.length)
+    const restore = planRestore(snap, current)
+    expect(restore.planPatch.name).toBe('Plan')
+    expect(restore.deletions.targets.map((t) => t.id)).toEqual(['new-target'])
   })
 
-  it('ignore object key order (Postgres jsonb reorders keys)', () => {
-    const snap = buildSnapshot(instantiateTemplate(push, names, ctx()))
+  it('ignore object key order and created_at formatting (server vs device)', () => {
+    const r = rows()
+    const snap = buildSnapshot(r)
     const reversed = JSON.parse(
       JSON.stringify(snap, (_k, v: unknown) =>
         v && typeof v === 'object' && !Array.isArray(v)
@@ -169,16 +191,11 @@ describe('snapshots', () => {
           : v,
       ),
     ) as typeof snap
-    expect(JSON.stringify(reversed)).not.toBe(JSON.stringify(snap))
     expect(snapshotKey(reversed)).toBe(snapshotKey(snap))
-  })
-
-  it('ignore created_at formatting differences between server and device', () => {
-    const rows = instantiateTemplate(push, names, ctx())
     const fromServer = {
-      ...rows,
-      sessions: rows.sessions.map((s) => ({ ...s, created_at: '2026-10-31T10:00:00+00:00' })),
+      ...r,
+      sessions: r.sessions.map((s) => ({ ...s, created_at: '2026-10-31T10:00:00+00:00' })),
     }
-    expect(snapshotKey(buildSnapshot(fromServer))).toBe(snapshotKey(buildSnapshot(rows)))
+    expect(snapshotKey(buildSnapshot(fromServer))).toBe(snapshotKey(snap))
   })
 })

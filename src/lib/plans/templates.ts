@@ -1,6 +1,6 @@
 /**
- * Plan presets. A plan is one type of workout (Push, Pull, Legs…) with versions A, B…
- * Every preset is copied into a normal, fully editable plan.
+ * Preset workouts to help build a plan, grouped by type (Push, Pull, Legs…) with versions A, B…
+ * Picking one copies it into the plan as a normal, fully editable workout.
  * Exercise names must match the seeded catalogue (checked by tests).
  *
  * Rep defaults for muscle growth: compounds 6–10 / 8–12 at RIR 1, isolations 10–15 to failure.
@@ -25,8 +25,6 @@ export interface TemplateSession {
   emoji: string
   description: string
   exercises: TemplateExercise[]
-  /** ISO weekdays this version is scheduled on (optional) */
-  weekdays?: number[]
 }
 
 export interface PlanTemplate {
@@ -334,41 +332,7 @@ export const TEMPLATES: readonly PlanTemplate[] = [
   },
 ]
 
-/** Next unused version letter for a plan: A, B, C… */
-export function nextVersionName(existing: readonly string[]): string {
-  const used = new Set(existing.map((n) => n.trim().toUpperCase()))
-  for (let i = 0; i < 26; i++) {
-    const letter = String.fromCharCode(65 + i)
-    if (!used.has(letter)) return letter
-  }
-  return `${existing.length + 1}`
-}
-
 /** "Push" + "A" → "Push A" */
 export function versionTitle(planName: string, versionName: string): string {
   return `${planName} ${versionName}`.trim()
-}
-
-export interface SplitGroup {
-  category: string
-  sessions: { id: string; version: string }[]
-}
-
-/**
- * Splits a plan whose sessions are named like "Push A", "Pull A", "Push B" into one group per
- * workout type, keeping the trailing letter as the version. Names without a letter become version A.
- */
-export function splitByCategory(
-  sessions: readonly { id: string; name: string; order: number }[],
-): SplitGroup[] {
-  const groups = new Map<string, SplitGroup>()
-  for (const s of sessions.toSorted((a, b) => a.order - b.order)) {
-    const m = /^(.*\S)\s+([A-Z])$/.exec(s.name.trim())
-    const category = m ? m[1]! : s.name.trim()
-    const group = groups.get(category) ?? { category, sessions: [] }
-    const version = m ? m[2]! : nextVersionName(group.sessions.map((x) => x.version))
-    group.sessions.push({ id: s.id, version })
-    groups.set(category, group)
-  }
-  return [...groups.values()]
 }

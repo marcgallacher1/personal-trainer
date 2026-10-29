@@ -82,12 +82,11 @@ export function PlanSessionScreen() {
           value={session.emoji}
           onChange={(emoji) => void updatePlanSession(session, { emoji })}
         />
-        <h1 className="min-w-0 truncate text-3xl font-bold tracking-tight">{rows.plan.name}</h1>
         <input
           key={session.id}
           defaultValue={session.name}
-          aria-label="Version name"
-          className="w-16 min-w-0 rounded-lg bg-surface px-2 text-3xl font-bold tracking-tight outline-none"
+          aria-label="Workout name"
+          className="min-w-0 flex-1 bg-transparent text-3xl font-bold tracking-tight outline-none"
           onBlur={(e) => {
             const name = e.target.value.trim()
             if (name && name !== session.name) void updatePlanSession(session, { name })
@@ -102,7 +101,7 @@ export function PlanSessionScreen() {
         <textarea
           key={`notes-${session.id}`}
           defaultValue={session.notes ?? ''}
-          placeholder="What this version focuses on, e.g. heavier chest, more side delts…"
+          placeholder="What this workout focuses on, e.g. heavier chest, more side delts…"
           rows={2}
           className="w-full resize-none rounded-2xl bg-surface p-4 outline-none"
           onBlur={(e) => {
@@ -202,7 +201,7 @@ export function PlanSessionScreen() {
       </Button>
 
       <button type="button" className="h-12 text-danger" onClick={() => setConfirmDelete(true)}>
-        Delete this version
+        Remove from plan
       </button>
 
       <Sheet
@@ -233,14 +232,14 @@ export function PlanSessionScreen() {
 
       <Confirm
         open={confirmDelete}
-        title={`Delete ${rows.plan.name} ${session.name}?`}
+        title={`Remove ${session.name} from ${rows.plan.name}?`}
         body="Its exercises and targets are removed from the plan. Logged workouts are kept."
-        confirmLabel="Delete"
+        confirmLabel="Remove"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={async () => {
           setConfirmDelete(false)
           await deletePlanSession(session)
-          showToast({ message: 'Version deleted' })
+          showToast({ message: `${session.name} removed` })
           void navigate(`/plans/${rows.plan.id}`, { replace: true })
         }}
       />

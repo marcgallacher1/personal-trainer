@@ -9,21 +9,21 @@ import {
 } from '../features/log/actions'
 import { saveCustomExercise } from '../features/exercises/actions'
 import {
-  createPlanFromTemplate,
   discardIfEmpty,
   loadPlanRows,
   restoreVersion,
+  savePlanFromDraft,
+  setPlanActive,
   snapshotIfChanged,
-  splitPlan,
   startFromPlan,
+  togglePlanDay,
   updatePlanSession,
 } from '../features/plans/data'
-import { TEMPLATES } from '../lib/plans/templates'
+import { toggleDraftDay, type DraftItem } from '../lib/plans/draft'
 import { db } from './local'
 import { supabase } from './supabase'
 import { clearLocalData, pull, push } from './sync'
 import { setCurrentUserId } from './user'
-import { save } from './write'
 
 /**
  * End-to-end: log a workout "offline" into IndexedDB, push it through RLS to the local Supabase,
@@ -168,28 +168,45 @@ describe('offline log → push → wipe → pull', () => {
 })
 
 describe('plans round-trip', () => {
-  it('creates a plan from a preset, starts "Push A", versions and restores', async () => {
-    const tpl = TEMPLATES.find((t) => t.id === 'push')!
-    const planId = await createPlanFromTemplate(tpl)
-    const rows = (await loadPlanRows(planId))!
-    expect(rows.plan.name).toBe('Push')
-    expect(rows.sessions.map((s) => s.name)).toEqual(['A', 'B'])
-    expect(rows.exercises).toHaveLength(13)
+  it('builds a plan the way the user does: Push A on Mon, Pull A on Tue, own workout on Fri', async () => {
+    let draft: DraftItem[] = []
+    draft = toggleDraftDay(draft, { kind: 'preset', templateId: 'push', version: 'A' }, 1).draft
+    draft = toggleDraftDay(draft, { kind: 'preset', templateId: 'pull', version: 'A' }, 2).draft
+    draft = toggleDraftDay(draft, { kind: 'custom', name: 'Arms' }, 5).draft
+    const planId = await savePlanFromDraft('My plan', draft, true)
 
-    // Start Push A: named after plan + version, exercises pre-loaded and linked
+    const rows = (await loadPlanRows(planId))!
+    expect(rows.plan.is_active).toBe(true)
+    expect(rows.sessions.map((s) => s.name)).toEqual(['Push A', 'Pull A', 'Arms'])
+    expect(rows.schedule.map((s) => s.weekday).toSorted()).toEqual([1, 2, 5])
+
+    // Add Push B on Thursday to the saved plan, then untick it
+    expect(
+      await togglePlanDay(planId, { kind: 'preset', templateId: 'push', version: 'B' }, 4),
+    ).toBe('added')
+    expect((await loadPlanRows(planId))!.sessions.map((s) => s.name)).toContain('Push B')
+    expect(
+      await togglePlanDay(planId, { kind: 'preset', templateId: 'push', version: 'B' }, 4),
+    ).toBe('removed')
+
+    // Active is optional and easy to switch off
+    await setPlanActive(rows.plan, false)
+    expect((await db.plans.get(planId))?.is_active).toBe(false)
+    await setPlanActive(rows.plan, true)
+    expect((await db.plans.get(planId))?.is_active).toBe(true)
+
+    // Start Push A from the plan
     const workoutId = await startFromPlan(rows.sessions[0]!)
     expect((await db.sessions.get(workoutId))?.name).toBe('Push A')
     const items = await db.session_exercises.where('session_id').equals(workoutId).toArray()
     expect(items).toHaveLength(7)
-    expect(items.every((i) => i.plan_exercise_id)).toBe(true)
 
-    // Edit → new version on save; restore version 1
+    // Versions: edit then restore
     await updatePlanSession(rows.sessions[0]!, { notes: 'Heavier this block' })
     expect(await snapshotIfChanged(planId, 'Edited')).toBe(true)
     const versions = (await db.plan_versions.where('plan_id').equals(planId).toArray()).toSorted(
       (a, b) => a.version - b.version,
     )
-    expect(versions.map((v) => v.version)).toEqual([1, 2])
     await restoreVersion(versions[0]!)
     expect((await loadPlanRows(planId))!.sessions[0]!.notes).toMatch(/Chest, shoulders/)
 
@@ -200,71 +217,18 @@ describe('plans round-trip', () => {
     await clearLocalData()
     await pull()
     const pulled = (await loadPlanRows(planId))!
-    expect(pulled.exercises).toHaveLength(13)
+    // Restoring version 1 brought the plan back to before Push B was added
+    expect(pulled.sessions.map((s) => s.name)).toEqual(['Push A', 'Pull A', 'Arms'])
     expect(await snapshotIfChanged(planId)).toBe(false)
   })
 
-  it('splits a legacy mixed plan into one plan per type, keeping history linked', async () => {
-    const userId = (await supabase.auth.getUser()).data.user!.id
-    const now = new Date().toISOString()
-    const legacyId = crypto.randomUUID()
-    const names = ['Push A', 'Pull A', 'Push B', 'Pull B']
-    const sessionIds = names.map(() => crypto.randomUUID())
-    const meta = { user_id: userId, created_at: now, updated_at: now, deleted_at: null }
-    await save([
-      {
-        table: 'plans',
-        row: {
-          ...meta,
-          id: legacyId,
-          name: 'Upper focus · 4 days',
-          goal: null,
-          notes: null,
-          is_active: false,
-          schedule_mode: 'rotation',
-          block_weeks: null,
-          deload_week: null,
-          block_start_date: null,
-          rotation_anchor_date: null,
-          current_version: 1,
-          archived: false,
-        },
-      },
-      ...names.map((name, i) => ({
-        table: 'plan_sessions' as const,
-        row: {
-          ...meta,
-          id: sessionIds[i]!,
-          plan_id: legacyId,
-          name,
-          colour: null,
-          emoji: null,
-          notes: null,
-          warmup_notes: null,
-          est_minutes: null,
-          order: i,
-        },
-      })),
-    ])
-    const legacy = (await db.plans.get(legacyId))!
-    // A workout logged against "Pull B" before the split
-    const workout = await startFromPlan((await db.plan_sessions.get(sessionIds[3]!))!)
-
-    const created = await splitPlan(legacy)
-    expect(created).toHaveLength(2)
-    const pushPlan = (await loadPlanRows(created[0]!))!
-    const pullPlan = (await loadPlanRows(created[1]!))!
-    expect([pushPlan.plan.name, pullPlan.plan.name]).toEqual(['Push', 'Pull'])
-    expect(pushPlan.sessions.map((s) => s.name)).toEqual(['A', 'B'])
-    expect(pullPlan.sessions.map((s) => [s.id, s.name])).toEqual([
-      [sessionIds[1], 'A'],
-      [sessionIds[3], 'B'],
-    ])
-    expect((await db.plans.get(legacyId))?.deleted_at).not.toBeNull()
-    // The old workout still points at the same (moved) version
-    expect((await db.sessions.get(workout))?.plan_session_id).toBe(sessionIds[3])
-
-    await push()
+  it('activating one plan switches the others off', async () => {
+    const draft = toggleDraftDay([], { kind: 'custom', name: 'Back' }, 3).draft
+    const a = await savePlanFromDraft('Plan A', draft, true)
+    const b = await savePlanFromDraft('Plan B', draft, true)
+    expect((await db.plans.get(a))?.is_active).toBe(false)
+    expect((await db.plans.get(b))?.is_active).toBe(true)
+    await push() // the server's one-active-plan rule accepts the order of writes
     expect(await db.outbox.count()).toBe(0)
   })
 

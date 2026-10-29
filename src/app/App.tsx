@@ -15,6 +15,7 @@ import { LogScreen } from '../features/log/LogScreen'
 import { MoreScreen } from '../features/more/MoreScreen'
 import { InstallScreen } from '../features/onboarding/InstallScreen'
 import { GoalsScreen } from '../features/more/GoalsScreen'
+import { PlanBuilderScreen } from '../features/plans/PlanBuilderScreen'
 import { PlanEditorScreen } from '../features/plans/PlanEditorScreen'
 import { PlanHistoryScreen } from '../features/plans/PlanHistoryScreen'
 import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
@@ -37,7 +38,9 @@ const router = createBrowserRouter([
       { path: '/exercises/:id/edit', element: <ExerciseFormScreen /> },
       { path: '/progress', element: <ProgressScreen /> },
       { path: '/plans', element: <PlansScreen /> },
+      { path: '/plans/new', element: <PlanBuilderScreen /> },
       { path: '/plans/:planId', element: <PlanEditorScreen /> },
+      { path: '/plans/:planId/add', element: <PlanBuilderScreen /> },
       { path: '/plans/:planId/sessions/:sessionId', element: <PlanSessionScreen /> },
       { path: '/plans/:planId/history', element: <PlanHistoryScreen /> },
       { path: '/goals', element: <GoalsScreen /> },

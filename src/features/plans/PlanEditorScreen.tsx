@@ -4,17 +4,18 @@ import { BackButton } from '../../components/BackButton'
 import { Button } from '../../components/Button'
 import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
-import { versionTitle } from '../../lib/plans/templates'
+import { DAY_NAMES, weekOf } from '../../lib/plans/draft'
 import {
-  addVersion,
   archivePlan,
   deletePlan,
+  deletePlanSession,
   duplicatePlan,
+  setPlanActive,
   snapshotIfChanged,
-  swapOrder,
   updatePlan,
   usePlanRows,
 } from './data'
+import { ActiveToggle } from './PlanBuilderScreen'
 import { WeekdayPicker } from './WeekdayPicker'
 
 /** Saves a version when you leave a plan screen, if anything changed. */
@@ -27,14 +28,14 @@ export function useSnapshotOnLeave(planId: string | undefined) {
   }, [planId])
 }
 
-/** One plan (e.g. Push) and its versions A, B… */
+/** A saved plan: its week, its workouts, and whether it's active. */
 export function PlanEditorScreen() {
   const { planId } = useParams()
   const navigate = useNavigate()
   const rows = usePlanRows(planId)
-  const [reordering, setReordering] = useState(false)
   const [menu, setMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
   useSnapshotOnLeave(planId)
 
   if (rows === undefined) return null
@@ -49,10 +50,19 @@ export function PlanEditorScreen() {
     )
   }
 
-  const { plan, sessions } = rows
+  const { plan, sessions, schedule } = rows
+  const items = sessions.map((s) => ({
+    id: s.id,
+    title: s.name,
+    weekdays: schedule
+      .filter((d) => d.plan_session_id === s.id && d.weekday !== null)
+      .map((d) => d.weekday!),
+  }))
+  const week = weekOf(items)
+  const toRemove = sessions.find((s) => s.id === removing)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <BackButton fallback="/plans" label="Plans" />
       <input
         key={plan.id}
@@ -65,95 +75,71 @@ export function PlanEditorScreen() {
         }}
       />
 
+      <ActiveToggle
+        active={plan.is_active}
+        onChange={(v) =>
+          void setPlanActive(plan, v).then(() =>
+            showToast({ message: v ? 'Plan is now active' : 'Plan switched off' }),
+          )
+        }
+      />
+
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">Versions</h2>
-          {sessions.length > 1 && (
-            <button
-              type="button"
-              className="h-8 px-3 text-sm font-semibold text-accent"
-              onClick={() => setReordering((r) => !r)}
-            >
-              {reordering ? 'Done' : 'Reorder'}
-            </button>
-          )}
-        </div>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Your week</h2>
+        <ul className="divide-y divide-border rounded-2xl bg-surface">
+          {week.map((d) => (
+            <li key={d.weekday} className="flex items-center gap-3 px-4 py-3">
+              <span className="w-10 shrink-0 font-bold">{DAY_NAMES[d.weekday - 1]}</span>
+              <span className={`min-w-0 flex-1 truncate ${d.titles.length ? '' : 'text-muted'}`}>
+                {d.titles.length ? d.titles.join(' + ') : 'Rest'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Workouts</h2>
         <ul className="flex flex-col gap-3">
-          {sessions.map((s, i) => {
-            const exercises = rows.exercises.filter((e) => e.plan_session_id === s.id)
-            const ids = new Set(exercises.map((e) => e.id))
-            const sets = rows.targets.filter(
-              (t) => ids.has(t.plan_exercise_id) && t.set_type !== 'warmup',
-            ).length
+          {sessions.map((s) => {
+            const count = rows.exercises.filter((e) => e.plan_session_id === s.id).length
             return (
-              <li key={s.id} className="flex items-center gap-2">
-                <div className="min-w-0 flex-1 rounded-2xl bg-surface">
+              <li key={s.id} className="rounded-2xl bg-surface">
+                <button
+                  type="button"
+                  onClick={() => void navigate(`/plans/${plan.id}/sessions/${s.id}`)}
+                  className="flex w-full items-start gap-3 p-4 text-left"
+                >
+                  <span className="text-2xl">{s.emoji ?? '🏋️'}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-lg font-bold">{s.name}</span>
+                    <span className="block text-sm text-muted">
+                      {count} exercise{count === 1 ? '' : 's'} · tap to edit
+                    </span>
+                  </span>
+                  <span className="text-2xl text-muted">›</span>
+                </button>
+                <div className="flex flex-col gap-2 px-4 pb-4">
+                  <WeekdayPicker planId={plan.id} sessionId={s.id} schedule={schedule} />
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!reordering) void navigate(`/plans/${plan.id}/sessions/${s.id}`)
-                    }}
-                    className="flex w-full items-start gap-3 p-4 text-left"
+                    className="h-9 self-end text-sm font-semibold text-danger"
+                    onClick={() => setRemoving(s.id)}
                   >
-                    <span className="text-2xl">{s.emoji ?? '🏋️'}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-lg font-bold">
-                        {versionTitle(plan.name, s.name)}
-                      </span>
-                      {s.notes && (
-                        <span className="line-clamp-2 block text-sm text-muted">{s.notes}</span>
-                      )}
-                      <span className="block text-xs text-muted">
-                        {exercises.length} exercises · {sets} sets
-                      </span>
-                    </span>
-                    <span className="text-2xl text-muted">›</span>
+                    Remove from plan
                   </button>
-                  {!reordering && (
-                    <div className="px-4 pb-4">
-                      <WeekdayPicker planId={plan.id} sessionId={s.id} schedule={rows.schedule} />
-                    </div>
-                  )}
                 </div>
-                {reordering && (
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={i === 0}
-                      onClick={() => void swapOrder('plan_sessions', sessions, i, -1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={i === sessions.length - 1}
-                      onClick={() => void swapOrder('plan_sessions', sessions, i, 1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                )}
               </li>
             )
           })}
         </ul>
-        <p className="mt-2 text-xs text-muted">
-          Days are optional. Anything scheduled for today appears first when you tap Start plan.
-        </p>
+        {sessions.length === 0 && (
+          <p className="rounded-2xl bg-surface p-6 text-center text-muted">No workouts yet.</p>
+        )}
       </section>
 
-      <Button
-        variant="secondary"
-        onClick={async () => {
-          const id = await addVersion(plan.id)
-          void navigate(`/plans/${plan.id}/sessions/${id}`)
-        }}
-      >
-        + Add version
+      <Button variant="secondary" onClick={() => void navigate(`/plans/${plan.id}/add`)}>
+        + Add workouts
       </Button>
 
       <button
@@ -200,9 +186,24 @@ export function PlanEditorScreen() {
       )}
 
       <Confirm
+        open={toRemove !== undefined}
+        title={`Remove ${toRemove?.name ?? 'workout'} from ${plan.name}?`}
+        body="Workouts you’ve already logged are kept."
+        confirmLabel="Remove"
+        onCancel={() => setRemoving(null)}
+        onConfirm={async () => {
+          const s = toRemove
+          setRemoving(null)
+          if (!s) return
+          await deletePlanSession(s)
+          showToast({ message: `${s.name} removed` })
+        }}
+      />
+
+      <Confirm
         open={confirmDelete}
         title={`Delete ${plan.name}?`}
-        body="Workouts you've already logged are kept."
+        body="Workouts you’ve already logged are kept."
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={async () => {
