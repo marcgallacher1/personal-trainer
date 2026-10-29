@@ -134,6 +134,7 @@ export function instantiateTemplate(
 
   template.sessions.forEach((ts, sIdx) => {
     const session = newSessionRow(ctx, plan.id, ts.name, sIdx, ts.emoji)
+    session.notes = ts.description
     rows.sessions.push(session)
 
     for (const weekday of ts.weekdays ?? []) {

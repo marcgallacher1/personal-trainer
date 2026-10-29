@@ -10,9 +10,11 @@ import {
 import { saveCustomExercise } from '../features/exercises/actions'
 import {
   createPlanFromTemplate,
+  discardIfEmpty,
   loadPlanRows,
   restoreVersion,
   snapshotIfChanged,
+  splitPlan,
   startFromPlan,
   updatePlanSession,
 } from '../features/plans/data'
@@ -21,6 +23,7 @@ import { db } from './local'
 import { supabase } from './supabase'
 import { clearLocalData, pull, push } from './sync'
 import { setCurrentUserId } from './user'
+import { save } from './write'
 
 /**
  * End-to-end: log a workout "offline" into IndexedDB, push it through RLS to the local Supabase,
@@ -165,41 +168,117 @@ describe('offline log → push → wipe → pull', () => {
 })
 
 describe('plans round-trip', () => {
-  it('creates a plan from a template, starts a workout from it, versions and restores', async () => {
-    const tpl = TEMPLATES.find((t) => t.id === 'upper-focus-4')!
+  it('creates a plan from a preset, starts "Push A", versions and restores', async () => {
+    const tpl = TEMPLATES.find((t) => t.id === 'push')!
     const planId = await createPlanFromTemplate(tpl)
     const rows = (await loadPlanRows(planId))!
-    expect(rows.sessions.map((s) => s.name)).toEqual(['Push A', 'Pull A', 'Push B', 'Pull B'])
-    expect(rows.exercises).toHaveLength(27)
-    expect(rows.plan.is_active).toBe(true)
+    expect(rows.plan.name).toBe('Push')
+    expect(rows.sessions.map((s) => s.name)).toEqual(['A', 'B'])
+    expect(rows.exercises).toHaveLength(13)
 
-    // Start Push A: exercises pre-loaded and linked to the plan
+    // Start Push A: named after plan + version, exercises pre-loaded and linked
     const workoutId = await startFromPlan(rows.sessions[0]!)
+    expect((await db.sessions.get(workoutId))?.name).toBe('Push A')
     const items = await db.session_exercises.where('session_id').equals(workoutId).toArray()
     expect(items).toHaveLength(7)
     expect(items.every((i) => i.plan_exercise_id)).toBe(true)
 
-    // Edit: rename a session → a new version on save
-    await updatePlanSession(rows.sessions[0]!, { name: 'Push A (heavy)' })
+    // Edit → new version on save; restore version 1
+    await updatePlanSession(rows.sessions[0]!, { notes: 'Heavier this block' })
     expect(await snapshotIfChanged(planId, 'Edited')).toBe(true)
     const versions = (await db.plan_versions.where('plan_id').equals(planId).toArray()).toSorted(
       (a, b) => a.version - b.version,
     )
     expect(versions.map((v) => v.version)).toEqual([1, 2])
-
-    // Restore version 1 → name back, and a new version recorded
     await restoreVersion(versions[0]!)
-    expect((await loadPlanRows(planId))!.sessions[0]!.name).toBe('Push A')
+    expect((await loadPlanRows(planId))!.sessions[0]!.notes).toMatch(/Chest, shoulders/)
 
     await push()
     expect(await db.outbox.count()).toBe(0)
 
-    // New device: pull, and confirm the server copy doesn't look "changed"
+    // New device: pull, and the server copy isn't seen as "changed"
     await clearLocalData()
     await pull()
     const pulled = (await loadPlanRows(planId))!
-    expect(pulled.exercises).toHaveLength(27)
-    expect(pulled.sessions[0]!.name).toBe('Push A')
+    expect(pulled.exercises).toHaveLength(13)
     expect(await snapshotIfChanged(planId)).toBe(false)
+  })
+
+  it('splits a legacy mixed plan into one plan per type, keeping history linked', async () => {
+    const userId = (await supabase.auth.getUser()).data.user!.id
+    const now = new Date().toISOString()
+    const legacyId = crypto.randomUUID()
+    const names = ['Push A', 'Pull A', 'Push B', 'Pull B']
+    const sessionIds = names.map(() => crypto.randomUUID())
+    const meta = { user_id: userId, created_at: now, updated_at: now, deleted_at: null }
+    await save([
+      {
+        table: 'plans',
+        row: {
+          ...meta,
+          id: legacyId,
+          name: 'Upper focus · 4 days',
+          goal: null,
+          notes: null,
+          is_active: false,
+          schedule_mode: 'rotation',
+          block_weeks: null,
+          deload_week: null,
+          block_start_date: null,
+          rotation_anchor_date: null,
+          current_version: 1,
+          archived: false,
+        },
+      },
+      ...names.map((name, i) => ({
+        table: 'plan_sessions' as const,
+        row: {
+          ...meta,
+          id: sessionIds[i]!,
+          plan_id: legacyId,
+          name,
+          colour: null,
+          emoji: null,
+          notes: null,
+          warmup_notes: null,
+          est_minutes: null,
+          order: i,
+        },
+      })),
+    ])
+    const legacy = (await db.plans.get(legacyId))!
+    // A workout logged against "Pull B" before the split
+    const workout = await startFromPlan((await db.plan_sessions.get(sessionIds[3]!))!)
+
+    const created = await splitPlan(legacy)
+    expect(created).toHaveLength(2)
+    const pushPlan = (await loadPlanRows(created[0]!))!
+    const pullPlan = (await loadPlanRows(created[1]!))!
+    expect([pushPlan.plan.name, pullPlan.plan.name]).toEqual(['Push', 'Pull'])
+    expect(pushPlan.sessions.map((s) => s.name)).toEqual(['A', 'B'])
+    expect(pullPlan.sessions.map((s) => [s.id, s.name])).toEqual([
+      [sessionIds[1], 'A'],
+      [sessionIds[3], 'B'],
+    ])
+    expect((await db.plans.get(legacyId))?.deleted_at).not.toBeNull()
+    // The old workout still points at the same (moved) version
+    expect((await db.sessions.get(workout))?.plan_session_id).toBe(sessionIds[3])
+
+    await push()
+    expect(await db.outbox.count()).toBe(0)
+  })
+
+  it('cancels an empty workout on leaving, but keeps one with sets', async () => {
+    const empty = await startSession()
+    expect(await discardIfEmpty(empty)).toBe(true)
+    expect((await db.sessions.get(empty))?.deleted_at).not.toBeNull()
+
+    const used = await startSession()
+    const bench = (await db.exercises.toArray()).find((e) => e.name === 'Barbell Bench Press')!
+    await addExercise(used, bench)
+    const se = (await db.session_exercises.where('session_id').equals(used).toArray())[0]!
+    await logSet(se, { weight_kg: 60, reps: 8, duration_seconds: null, set_type: 'working' }, null)
+    expect(await discardIfEmpty(used)).toBe(false)
+    expect((await db.sessions.get(used))?.deleted_at).toBeNull()
   })
 })

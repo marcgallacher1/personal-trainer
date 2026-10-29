@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BackButton } from '../../components/BackButton'
 import { Link, useNavigate, useParams } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Confirm } from '../../components/Confirm'
@@ -44,9 +45,7 @@ export function ExerciseDetailScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to="/exercises" className="text-sm text-accent">
-        ‹ Exercises
-      </Link>
+      <BackButton fallback="/exercises" />
       <div>
         <PageTitle>{exercise.name}</PageTitle>
         <p className="-mt-3 text-sm text-muted">

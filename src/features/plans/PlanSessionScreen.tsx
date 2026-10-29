@@ -16,7 +16,9 @@ import {
   updatePlanSession,
   usePlanRows,
 } from './data'
-import { useSnapshotOnLeave, WeekdayPicker } from './PlanEditorScreen'
+import { BackButton } from '../../components/BackButton'
+import { useSnapshotOnLeave } from './PlanEditorScreen'
+import { WeekdayPicker } from './WeekdayPicker'
 import { PlanExerciseSheet } from './PlanExerciseSheet'
 
 const EMOJIS = ['💪', '🦍', '🔥', '⚡', '🏋️', '🦵', '🍑', '🎯', '🅰️', '🅱️', '⭐', '🚀']
@@ -73,20 +75,19 @@ export function PlanSessionScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to={`/plans/${rows.plan.id}`} className="text-sm text-accent">
-        ‹ {rows.plan.name}
-      </Link>
+      <BackButton fallback={`/plans/${rows.plan.id}`} label={rows.plan.name} />
 
       <div className="flex items-center gap-3">
         <EmojiButton
           value={session.emoji}
           onChange={(emoji) => void updatePlanSession(session, { emoji })}
         />
+        <h1 className="min-w-0 truncate text-3xl font-bold tracking-tight">{rows.plan.name}</h1>
         <input
           key={session.id}
           defaultValue={session.name}
-          aria-label="Session name"
-          className="min-w-0 flex-1 bg-transparent text-3xl font-bold tracking-tight outline-none"
+          aria-label="Version name"
+          className="w-16 min-w-0 rounded-lg bg-surface px-2 text-3xl font-bold tracking-tight outline-none"
           onBlur={(e) => {
             const name = e.target.value.trim()
             if (name && name !== session.name) void updatePlanSession(session, { name })
@@ -94,12 +95,27 @@ export function PlanSessionScreen() {
         />
       </div>
 
-      {rows.plan.schedule_mode === 'weekday' && (
-        <section className="rounded-2xl bg-surface pt-3">
-          <p className="px-4 pb-2 text-xs font-semibold tracking-wide text-muted uppercase">Days</p>
-          <WeekdayPicker planId={rows.plan.id} sessionId={session.id} schedule={rows.schedule} />
-        </section>
-      )}
+      <section>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+          Description
+        </h2>
+        <textarea
+          key={`notes-${session.id}`}
+          defaultValue={session.notes ?? ''}
+          placeholder="What this version focuses on, e.g. heavier chest, more side delts…"
+          rows={2}
+          className="w-full resize-none rounded-2xl bg-surface p-4 outline-none"
+          onBlur={(e) => {
+            const notes = e.target.value.trim() || null
+            if (notes !== session.notes) void updatePlanSession(session, { notes })
+          }}
+        />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Days</h2>
+        <WeekdayPicker planId={rows.plan.id} sessionId={session.id} schedule={rows.schedule} />
+      </section>
 
       <section>
         <div className="mb-2 flex items-center justify-between">
@@ -185,25 +201,8 @@ export function PlanSessionScreen() {
         + Add exercise
       </Button>
 
-      <section>
-        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-          Session notes
-        </h2>
-        <textarea
-          key={`notes-${session.id}`}
-          defaultValue={session.notes ?? ''}
-          placeholder="Warm-up, focus for this session…"
-          rows={2}
-          className="w-full resize-none rounded-2xl bg-surface p-4 outline-none"
-          onBlur={(e) => {
-            const notes = e.target.value.trim() || null
-            if (notes !== session.notes) void updatePlanSession(session, { notes })
-          }}
-        />
-      </section>
-
       <button type="button" className="h-12 text-danger" onClick={() => setConfirmDelete(true)}>
-        Delete session
+        Delete this version
       </button>
 
       <Sheet
@@ -234,15 +233,15 @@ export function PlanSessionScreen() {
 
       <Confirm
         open={confirmDelete}
-        title={`Delete ${session.name}?`}
+        title={`Delete ${rows.plan.name} ${session.name}?`}
         body="Its exercises and targets are removed from the plan. Logged workouts are kept."
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={async () => {
           setConfirmDelete(false)
           await deletePlanSession(session)
-          showToast({ message: 'Session deleted' })
-          void navigate(`/plans/${rows.plan.id}`)
+          showToast({ message: 'Version deleted' })
+          void navigate(`/plans/${rows.plan.id}`, { replace: true })
         }}
       />
     </div>

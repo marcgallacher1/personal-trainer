@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import {
@@ -10,13 +10,13 @@ import {
 } from '../../db/queries'
 import { monthGrid, shiftMonth } from '../../lib/time/calendar'
 import { cardioName } from '../../lib/cardio'
-import { startSession } from './actions'
+import { StartPlanSheet } from '../plans/StartPlanSheet'
 import { formatDuration, londonDate, sessionTitle } from './format'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 export function LogScreen() {
-  const navigate = useNavigate()
+  const [choosing, setChoosing] = useState(false)
   const active = useActiveSession()
   const summaries = useSessionSummaries()
   const exercises = useExercises()
@@ -64,16 +64,11 @@ export function LogScreen() {
           <p className="mt-1 font-semibold">Resume ›</p>
         </Link>
       ) : (
-        <Button
-          className="h-16 text-xl"
-          onClick={async () => {
-            const id = await startSession()
-            void navigate(`/log/session/${id}`)
-          }}
-        >
-          Start workout
+        <Button className="h-16 text-xl" onClick={() => setChoosing(true)}>
+          Start plan
         </Button>
       )}
+      <StartPlanSheet open={choosing} onClose={() => setChoosing(false)} />
 
       <section className="rounded-3xl bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">

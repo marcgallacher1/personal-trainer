@@ -27,7 +27,12 @@ import {
   snapshotToJson,
 } from '../../lib/plans/snapshot'
 import { quickSets, type TargetLike } from '../../lib/plans/targets'
-import type { PlanTemplate } from '../../lib/plans/templates'
+import {
+  nextVersionName,
+  splitByCategory,
+  versionTitle,
+  type PlanTemplate,
+} from '../../lib/plans/templates'
 
 export type PlanVersionRow = Tables<'plan_versions'>
 export type Profile = Tables<'profiles'>
@@ -48,19 +53,40 @@ export function usePlans(): PlanRow[] | undefined {
         .filter(live)
         .toSorted(
           (a, b) =>
-            Number(b.is_active) - Number(a.is_active) ||
-            Number(a.archived) - Number(b.archived) ||
-            b.created_at.localeCompare(a.created_at),
+            Number(a.archived) - Number(b.archived) || a.created_at.localeCompare(b.created_at),
         ),
     [],
   )
 }
 
-export function useActivePlan(): PlanRow | null | undefined {
-  return useLiveQuery(
-    async () => (await db.plans.toArray()).find((p) => p.is_active && live(p)) ?? null,
-    [],
-  )
+export interface PlanWithVersions {
+  plan: PlanRow
+  versions: PlanSessionRow[]
+  schedule: PlanScheduleRow[]
+  exercises: PlanExerciseRow[]
+  targets: PlanSetTargetRow[]
+}
+
+/** Every non-archived plan with its versions, schedule, exercises and targets (for the start menu). */
+export function usePlanLibrary(): PlanWithVersions[] | undefined {
+  return useLiveQuery(async () => {
+    const plans = (await db.plans.toArray())
+      .filter((p) => live(p) && !p.archived)
+      .toSorted((a, b) => a.created_at.localeCompare(b.created_at))
+    const out: PlanWithVersions[] = []
+    for (const plan of plans) {
+      const rows = await loadPlanRows(plan.id)
+      if (!rows) continue
+      out.push({
+        plan,
+        versions: rows.sessions,
+        schedule: rows.schedule,
+        exercises: rows.exercises,
+        targets: rows.targets,
+      })
+    }
+    return out
+  }, [])
 }
 
 /** Every live row of a plan, in display order. */
@@ -145,25 +171,20 @@ const insertAll = (rows: PlanRows): Change[] => [
   ...rows.targets.map((row) => ({ table: 'plan_set_targets' as const, row })),
 ]
 
-async function hasActivePlan(): Promise<boolean> {
-  return (await db.plans.toArray()).some((p) => p.is_active && live(p))
-}
-
 export async function createPlanFromTemplate(template: PlanTemplate): Promise<string> {
   const exercises = (await db.exercises.toArray()).filter(live)
   const byName = new Map(exercises.map((e) => [e.name, e.id]))
   const rows = instantiateTemplate(template, byName, ctx())
-  rows.plan.is_active = !(await hasActivePlan())
   await save(insertAll(rows))
   await snapshotIfChanged(rows.plan.id, 'Created from template')
   return rows.plan.id
 }
 
+/** A new plan (workout type) with an empty version A. */
 export async function createBlankPlan(name: string): Promise<string> {
   const c = ctx()
-  const plan = newPlanRow(c, name, 'rotation')
-  plan.is_active = !(await hasActivePlan())
-  const session = newSessionRow(c, plan.id, 'Session A', 0)
+  const plan = newPlanRow(c, name, 'weekday')
+  const session = newSessionRow(c, plan.id, 'A', 0)
   await save([
     { table: 'plans', row: plan },
     { table: 'plan_sessions', row: session },
@@ -176,17 +197,44 @@ export async function updatePlan(plan: PlanRow, patch: Partial<PlanRow>): Promis
   await saveOne('plans', { ...plan, ...patch })
 }
 
-/** Makes this the one active plan. Deactivations go first (one active plan per user). */
-export async function activatePlan(plan: PlanRow): Promise<void> {
-  const others = (await db.plans.toArray()).filter((p) => p.is_active && p.id !== plan.id)
-  await save([
-    ...others.map((p) => ({ table: 'plans' as const, row: { ...p, is_active: false } })),
-    { table: 'plans', row: { ...plan, is_active: true, archived: false } },
-  ])
+export async function archivePlan(plan: PlanRow, archived: boolean): Promise<void> {
+  await updatePlan(plan, { archived, is_active: false })
 }
 
-export async function archivePlan(plan: PlanRow, archived: boolean): Promise<void> {
-  await updatePlan(plan, { archived, is_active: archived ? false : plan.is_active })
+/** True when a plan mixes workout types ("Push A", "Pull A"…) and could be split up. */
+export function canSplit(sessions: readonly PlanSessionRow[]): boolean {
+  return splitByCategory(sessions).length > 1
+}
+
+/**
+ * Splits a mixed plan into one plan per workout type ("Push A, Push B" → plan "Push", versions A/B).
+ * Sessions keep their ids (so logged workouts stay linked); they just move to the new plans.
+ */
+export async function splitPlan(plan: PlanRow): Promise<string[]> {
+  const rows = await loadPlanRows(plan.id)
+  if (!rows) return []
+  const c = ctx()
+  const changes: Change[] = []
+  const created: string[] = []
+  for (const group of splitByCategory(rows.sessions)) {
+    const target = newPlanRow(c, group.category, 'weekday')
+    created.push(target.id)
+    changes.push({ table: 'plans', row: target })
+    group.sessions.forEach((g, order) => {
+      const s = rows.sessions.find((x) => x.id === g.id)!
+      changes.push({
+        table: 'plan_sessions',
+        row: { ...s, plan_id: target.id, name: g.version, order },
+      })
+      for (const sch of rows.schedule.filter((x) => x.plan_session_id === s.id)) {
+        changes.push({ table: 'plan_schedule', row: { ...sch, plan_id: target.id } })
+      }
+    })
+  }
+  changes.push(deletion('plans', { ...plan, is_active: false }))
+  await save(changes)
+  for (const id of created) await snapshotIfChanged(id, `Split from ${plan.name}`)
+  return created
 }
 
 export async function deletePlan(plan: PlanRow): Promise<Change[]> {
@@ -259,8 +307,10 @@ export async function duplicatePlan(plan: PlanRow): Promise<string> {
 // Sessions & schedule
 // ---------------------------------------------------------------------------
 
-export async function addPlanSession(planId: string, name: string): Promise<string> {
+/** Adds the next version (A, B, C…) to a plan. */
+export async function addVersion(planId: string): Promise<string> {
   const existing = (await db.plan_sessions.where('plan_id').equals(planId).toArray()).filter(live)
+  const name = nextVersionName(existing.map((s) => s.name))
   const row = newSessionRow(ctx(), planId, name, Math.max(-1, ...existing.map((s) => s.order)) + 1)
   await saveOne('plan_sessions', row)
   return row.id
@@ -504,9 +554,10 @@ export async function restoreVersion(v: PlanVersionRow): Promise<void> {
 // Workouts from plans, and edits made during a workout
 // ---------------------------------------------------------------------------
 
-/** Starts a workout pre-loaded with a plan session's exercises (sets stay blank). */
+/** Starts a workout pre-loaded with a plan version's exercises; named e.g. "Push A". */
 export async function startFromPlan(planSession: PlanSessionRow): Promise<string> {
   const c = ctx()
+  const plan = await db.plans.get(planSession.plan_id)
   const exercises = (
     await db.plan_exercises.where('plan_session_id').equals(planSession.id).toArray()
   )
@@ -517,7 +568,7 @@ export async function startFromPlan(planSession: PlanSessionRow): Promise<string
     user_id: c.userId,
     plan_id: planSession.plan_id,
     plan_session_id: planSession.id,
-    name: planSession.name,
+    name: plan ? versionTitle(plan.name, planSession.name) : planSession.name,
     started_at: c.now,
     ended_at: null,
     notes: null,
@@ -601,4 +652,28 @@ export async function setMuscleFlags(
   patch: Partial<Pick<MuscleTarget, 'priority' | 'paused'>>,
 ): Promise<void> {
   await saveOne('muscle_targets', { ...target, ...patch })
+}
+
+// ---------------------------------------------------------------------------
+// Leaving a workout
+// ---------------------------------------------------------------------------
+
+/**
+ * Cancels a workout that has nothing logged (no sets, no cardio), e.g. started by mistake.
+ * Returns true if it was discarded.
+ */
+export async function discardIfEmpty(sessionId: string): Promise<boolean> {
+  const session = await db.sessions.get(sessionId)
+  if (!session || session.deleted_at || session.ended_at) return false
+  const [sets, cardio, items] = await Promise.all([
+    db.sets.where('session_id').equals(sessionId).toArray(),
+    db.cardio_entries.where('session_id').equals(sessionId).toArray(),
+    db.session_exercises.where('session_id').equals(sessionId).toArray(),
+  ])
+  if (sets.some(live) || cardio.some(live)) return false
+  await save([
+    ...items.filter(live).map((i) => deletion('session_exercises', i)),
+    deletion('sessions', session),
+  ])
+  return true
 }

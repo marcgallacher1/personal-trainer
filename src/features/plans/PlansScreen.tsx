@@ -1,23 +1,29 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageTitle } from '../../app/Layout'
-import { Button } from '../../components/Button'
 import { Sheet } from '../../components/Sheet'
+import { showToast } from '../../components/Toast'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
-import { TEMPLATES, type PlanTemplate } from '../../lib/plans/templates'
-import { createBlankPlan, createPlanFromTemplate, usePlans } from './data'
+import type { PlanSessionRow } from '../../lib/plans/instantiate'
+import { splitByCategory, TEMPLATES, type PlanTemplate } from '../../lib/plans/templates'
+import { canSplit, createBlankPlan, createPlanFromTemplate, splitPlan, usePlans } from './data'
 
 export function PlansScreen() {
   const navigate = useNavigate()
   const plans = usePlans()
   const [creating, setCreating] = useState(false)
-  const sessionCounts = useLiveQuery(async () => {
-    const counts = new Map<string, number>()
+  const [customName, setCustomName] = useState('')
+  const versionsByPlan = useLiveQuery(async () => {
+    const map = new Map<string, PlanSessionRow[]>()
     for (const s of await db.plan_sessions.toArray()) {
-      if (!s.deleted_at) counts.set(s.plan_id, (counts.get(s.plan_id) ?? 0) + 1)
+      if (s.deleted_at) continue
+      map.set(
+        s.plan_id,
+        [...(map.get(s.plan_id) ?? []), s].toSorted((a, b) => a.order - b.order),
+      )
     }
-    return counts
+    return map
   }, [])
 
   async function fromTemplate(t: PlanTemplate) {
@@ -26,75 +32,94 @@ export function PlansScreen() {
     void navigate(`/plans/${id}`)
   }
 
-  async function blank() {
+  async function custom() {
+    const name = customName.trim()
+    if (!name) return
     setCreating(false)
-    const id = await createBlankPlan('My plan')
+    setCustomName('')
+    const id = await createBlankPlan(name)
     void navigate(`/plans/${id}`)
   }
 
-  const suggested = TEMPLATES.find((t) => t.suggested)
-  const active = (plans ?? []).filter((p) => !p.archived)
+  const visible = (plans ?? []).filter((p) => !p.archived)
   const archived = (plans ?? []).filter((p) => p.archived)
+  const existingNames = new Set(visible.map((p) => p.name.toLowerCase()))
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-end justify-between">
         <PageTitle>Plans</PageTitle>
-        {(plans?.length ?? 0) > 0 && (
-          <button
-            type="button"
-            className="mb-4 text-sm font-semibold text-accent"
-            onClick={() => setCreating(true)}
-          >
-            + New plan
-          </button>
-        )}
+        <button
+          type="button"
+          className="mb-4 text-sm font-semibold text-accent"
+          onClick={() => setCreating(true)}
+        >
+          + New plan
+        </button>
       </div>
+      <p className="-mt-3 text-sm text-muted">
+        Each plan is a type of workout (Push, Pull, Legs…) with versions A, B… Start one from the
+        Today screen.
+      </p>
 
-      {plans && plans.length === 0 && (
-        <div className="flex flex-col gap-3">
-          <p className="text-muted">
-            A plan is your set of sessions (e.g. Push A, Pull A…). It drives the Today screen and
-            loads exercises when you start a workout.
+      {plans && visible.length === 0 && (
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="rounded-3xl bg-accent p-5 text-left text-accent-fg"
+        >
+          <p className="text-xl font-bold">Create your first plan</p>
+          <p className="mt-1 text-sm opacity-90">
+            Start from Push, Pull, Shoulders & arms, Back & arms… or make your own.
           </p>
-          {suggested && (
-            <button
-              type="button"
-              onClick={() => void fromTemplate(suggested)}
-              className="rounded-3xl bg-accent p-5 text-left text-accent-fg"
-            >
-              <p className="text-sm font-semibold opacity-80">Suggested for you</p>
-              <p className="text-xl font-bold">{suggested.name}</p>
-              <p className="mt-1 text-sm opacity-90">{suggested.description}</p>
-              <p className="mt-2 font-semibold">Use this plan ›</p>
-            </button>
-          )}
-          <Button variant="secondary" onClick={() => setCreating(true)}>
-            Other templates or a blank plan
-          </Button>
-        </div>
+        </button>
       )}
 
-      {active.map((p) => (
-        <Link
-          key={p.id}
-          to={`/plans/${p.id}`}
-          className={`block rounded-2xl p-4 ${p.is_active ? 'bg-accent/15 ring-2 ring-accent' : 'bg-surface'}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-lg font-bold">{p.name}</p>
-            {p.is_active && (
-              <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-fg">
-                ACTIVE
+      {visible.map((p) => {
+        const versions = versionsByPlan?.get(p.id) ?? []
+        const mixed = canSplit(versions)
+        return (
+          <div key={p.id} className="rounded-2xl bg-surface">
+            <Link to={`/plans/${p.id}`} className="flex items-center gap-3 p-4">
+              <span className="text-2xl">{versions[0]?.emoji ?? '🏋️'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-lg font-bold">{p.name}</span>
+                <span className="block truncate text-sm text-muted">
+                  {mixed
+                    ? versions.map((v) => v.name).join(' · ')
+                    : `${versions.length} version${versions.length === 1 ? '' : 's'}${
+                        versions.length ? `: ${versions.map((v) => v.name).join(', ')}` : ''
+                      }`}
+                </span>
               </span>
+              <span className="text-2xl text-muted">›</span>
+            </Link>
+            {mixed && (
+              <div className="border-t border-border p-4">
+                <p className="text-sm">
+                  This plan mixes workout types. Split it into{' '}
+                  <b>
+                    {splitByCategory(versions)
+                      .map((g) => g.category)
+                      .join(', ')}
+                  </b>
+                  ? Your logged workouts stay linked.
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 h-11 w-full rounded-xl bg-accent font-bold text-accent-fg"
+                  onClick={async () => {
+                    const ids = await splitPlan(p)
+                    showToast({ message: `Split into ${ids.length} plans` })
+                  }}
+                >
+                  Split it up
+                </button>
+              </div>
             )}
           </div>
-          <p className="text-sm text-muted">
-            {sessionCounts?.get(p.id) ?? 0} sessions ·{' '}
-            {p.schedule_mode === 'rotation' ? 'Rotation, any days' : 'Fixed weekdays'}
-          </p>
-        </Link>
-      ))}
+        )
+      })}
 
       {archived.length > 0 && (
         <section>
@@ -105,7 +130,7 @@ export function PlansScreen() {
             <Link
               key={p.id}
               to={`/plans/${p.id}`}
-              className="block rounded-2xl bg-surface p-4 opacity-70"
+              className="mb-2 block rounded-2xl bg-surface p-4 opacity-70"
             >
               <p className="truncate font-semibold">{p.name}</p>
             </Link>
@@ -116,35 +141,61 @@ export function PlansScreen() {
       <Sheet
         open={creating}
         title="New plan"
-        subtitle="Every template becomes a normal plan you can edit."
+        subtitle="Starts with exercises you can change, or make your own."
         closeLabel="Cancel"
         onClose={() => setCreating(false)}
       >
         <div className="flex flex-col gap-3">
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => void fromTemplate(t)}
-              className={`rounded-2xl p-4 text-left ${t.suggested ? 'bg-accent/15 ring-2 ring-accent' : 'bg-surface'}`}
-            >
-              {t.suggested && (
-                <p className="text-xs font-bold tracking-wide text-accent uppercase">
-                  Suggested for you
-                </p>
-              )}
-              <p className="text-lg font-bold">{t.name}</p>
-              <p className="text-sm text-muted">{t.description}</p>
-              <p className="mt-1 text-xs text-muted">{t.sessions.map((s) => s.name).join(' · ')}</p>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => void blank()}
-            className="h-14 rounded-2xl border border-dashed border-border font-semibold text-muted"
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void custom()
+            }}
           >
-            Start from a blank plan
-          </button>
+            <input
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              placeholder="Your own, e.g. Arms"
+              className="h-12 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 outline-none focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={!customName.trim()}
+              className="h-12 rounded-xl bg-accent px-4 font-bold text-accent-fg disabled:opacity-40"
+            >
+              Create
+            </button>
+          </form>
+
+          <h3 className="mt-2 text-xs font-semibold tracking-wide text-muted uppercase">
+            Or start from
+          </h3>
+          {[...TEMPLATES]
+            .toSorted((a, b) => Number(Boolean(b.suggested)) - Number(Boolean(a.suggested)))
+            .map((t) => {
+              const exists = existingNames.has(t.name.toLowerCase())
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => void fromTemplate(t)}
+                  className={`rounded-2xl p-4 text-left ${t.suggested ? 'bg-accent/10' : 'bg-surface'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-lg font-bold">
+                      {t.sessions[0]?.emoji} {t.name}
+                    </p>
+                    {exists && <span className="text-xs text-muted">you have this</span>}
+                  </div>
+                  <p className="text-sm text-muted">{t.description}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    Versions: {t.sessions.map((s) => s.name).join(', ')}
+                    {t.suggested ? ' · suits your upper-body focus' : ''}
+                  </p>
+                </button>
+              )
+            })}
         </div>
       </Sheet>
     </div>

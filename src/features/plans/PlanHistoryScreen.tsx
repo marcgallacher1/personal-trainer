@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { BackButton } from '../../components/BackButton'
+import { useParams } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
@@ -17,9 +18,7 @@ export function PlanHistoryScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to={`/plans/${rows.plan.id}`} className="text-sm text-accent">
-        ‹ {rows.plan.name}
-      </Link>
+      <BackButton fallback={`/plans/${rows.plan.id}`} label={rows.plan.name} />
       <PageTitle>Version history</PageTitle>
       <p className="-mt-2 text-sm text-muted">
         A version is saved whenever you leave the plan editor after changing something. Restoring

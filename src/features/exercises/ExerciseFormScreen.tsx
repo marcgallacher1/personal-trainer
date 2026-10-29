@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { BackButton } from '../../components/BackButton'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { useExercise, useExerciseMuscleMap, useMuscles, type Exercise } from '../../db/queries'
@@ -71,9 +72,7 @@ function Form({ initial, existing }: { initial: ExerciseInput; existing?: Exerci
 
   return (
     <div className="flex flex-col gap-5">
-      <Link to={addTo ? `/log/session/${addTo}` : '/exercises'} className="text-sm text-accent">
-        ‹ Back
-      </Link>
+      <BackButton fallback={addTo ? `/log/session/${addTo}` : '/exercises'} />
       <PageTitle>{existing ? 'Edit exercise' : 'New exercise'}</PageTitle>
 
       <input

@@ -64,18 +64,28 @@ new window at the deep link.
 
 ## Plans
 
-A plan contains sessions, which contain planned exercises, which contain per-set targets. All of
-these are ordinary synced rows. Rotation order is the order of the sessions; weekday mode uses
-`plan_schedule` rows. Templates in `src/lib/plans/templates.ts` are copied into normal rows by the
-pure `instantiateTemplate`.
+A **plan** is one type of workout (Push, Pull, Shoulders & arms…). Each plan has versions A, B…
+(`plan_sessions`), which contain planned exercises, which contain per-set targets. All of these are
+ordinary synced rows. Versions can be assigned to weekdays (`plan_schedule`); anything scheduled
+for today is offered first when you tap **Start plan**. There is no "active plan". Presets in
+`src/lib/plans/templates.ts` are copied into normal rows by the pure `instantiateTemplate`. Older
+mixed plans ("Push A, Pull A…") can be split into one plan per type. Version ids are kept, so
+logged workouts stay linked.
 
-**Versions:** when you leave a plan screen, the plan's live rows are snapshotted into
+**Version history:** when you leave a plan screen, the plan's live rows are snapshotted into
 `plan_versions`, but only if they differ from the latest version. The comparison ignores key order
 and `created_at`, because Postgres `jsonb` and server timestamps format differently from the
 device. Restoring a version first saves the current state as a new version, then upserts the
 snapshot's rows and soft-deletes anything added since.
 
-**Workouts from plans:** `startFromPlan` copies a session's exercises into the workout, linked by
-`plan_exercise_id`. Each logged set records its `plan_set_target_id`. Targets are shown as hints
-only; weights never carry over between workouts. Mid-workout edits (add, swap, remove) ask whether
-to apply them today only or also to the plan.
+**Workouts from plans:** `startFromPlan` copies a version's exercises into the workout, linked by
+`plan_exercise_id`, and names it e.g. "Push A". Each logged set records its `plan_set_target_id`.
+Targets are shown as hints only; weights never carry over between workouts. Mid-workout edits
+(add, swap, remove) ask whether to apply them today only or also to the plan.
+
+## Navigation
+
+Home-screen apps have no browser back button, so every screen has a top-left **Back**. It goes to
+the previous screen, or to a sensible parent when the app was opened directly on that screen.
+Leaving a workout with nothing logged cancels it, so a mis-tap never leaves an empty workout
+behind.

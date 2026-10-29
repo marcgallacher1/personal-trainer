@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BackButton } from '../../components/BackButton'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { Confirm } from '../../components/Confirm'
@@ -19,7 +20,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
-import { addWorkoutExerciseToPlan } from '../plans/data'
+import { addWorkoutExerciseToPlan, discardIfEmpty } from '../plans/data'
 import {
   addExercise,
   deleteSession,
@@ -119,7 +120,7 @@ export function SessionScreen() {
   async function remove(s: Session) {
     setConfirmDelete(false)
     const changes = await deleteSession(s)
-    void navigate('/log')
+    void navigate('/', { replace: true })
     showToast({
       message: 'Workout deleted',
       action: { label: 'Undo', onClick: () => void undoDeletion(changes) },
@@ -129,9 +130,13 @@ export function SessionScreen() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link to="/log" className="text-sm text-accent">
-          ‹ Log
-        </Link>
+        <BackButton
+          fallback="/"
+          onBack={async () => {
+            // Nothing logged? Don't leave an empty workout behind.
+            if (await discardIfEmpty(session.id)) showToast({ message: 'Empty workout cancelled' })
+          }}
+        />
         <input
           defaultValue={session.name ?? ''}
           key={session.id}
@@ -283,7 +288,7 @@ export function SessionScreen() {
           onClick={async () => {
             await finishSession(session)
             showToast({ message: `Workout saved · ${workingSets.length} sets` })
-            void navigate('/log')
+            void navigate('/', { replace: true })
           }}
         >
           Save workout

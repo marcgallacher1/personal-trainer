@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { BackButton } from '../../components/BackButton'
 import { PageTitle } from '../../app/Layout'
 import { Stepper } from '../../components/Stepper'
 import { showToast } from '../../components/Toast'
@@ -94,9 +94,7 @@ function GoalsForm({ profile, targets }: { profile: Profile; targets: MuscleTarg
   return (
     <div className="flex flex-col gap-6 pb-20">
       <div>
-        <Link to="/more" className="text-sm text-accent">
-          ‹ More
-        </Link>
+        <BackButton fallback="/more" label="More" />
         <PageTitle>Goals</PageTitle>
         <p className="-mt-2 text-sm text-muted">
           These shape your plan rating, weekly report and suggestions. Change them any time.
