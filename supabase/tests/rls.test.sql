@@ -9,7 +9,7 @@ values
   ('11111111-1111-1111-1111-111111111111', 'a@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
   ('22222222-2222-2222-2222-222222222222', 'b@test.local', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
 
-select is((select count(*)::int from public.profiles), 2, 'signup trigger creates a profile per user');
+select is((select count(*)::int from public.profiles where id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')), 2, 'signup trigger creates a profile per user');
 select is((select count(*)::int from public.muscle_targets where user_id = '11111111-1111-1111-1111-111111111111'), 17, 'signup trigger seeds 17 muscle targets');
 
 -- Act as user A.

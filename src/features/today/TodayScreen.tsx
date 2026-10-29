@@ -1,27 +1,18 @@
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { PageTitle } from '../../app/Layout'
+import { Button } from '../../components/Button'
 import { ComingSoon } from '../../components/ComingSoon'
-import { db } from '../../db/local'
-import { pullReference } from '../../db/sync'
-import { useAuth } from '../auth/AuthProvider'
-
-type PullState =
-  { kind: 'loading' } | { kind: 'ok'; count: number } | { kind: 'error'; message: string }
+import { useActiveSession, useSessionSummaries } from '../../db/queries'
+import { startSession } from '../log/actions'
+import { formatDuration, sessionTitle } from '../log/format'
 
 export function TodayScreen() {
-  const { session } = useAuth()
-  const [pull, setPull] = useState<PullState>({ kind: 'loading' })
-  const localCount = useLiveQuery(() => db.exercises.count(), [])
+  const navigate = useNavigate()
+  const active = useActiveSession()
+  const summaries = useSessionSummaries()
   const [now] = useState(() => new Date())
-
-  useEffect(() => {
-    pullReference()
-      .then(({ exercises }) => setPull({ kind: 'ok', count: exercises }))
-      .catch((e: unknown) =>
-        setPull({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
-      )
-  }, [])
+  const last = summaries?.find((s) => s.session.ended_at !== null)
 
   const today = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
@@ -35,22 +26,41 @@ export function TodayScreen() {
       <p className="text-sm text-muted">{today}</p>
       <PageTitle>Today</PageTitle>
       <div className="flex flex-col gap-4">
-        <section className="rounded-2xl bg-surface p-4">
-          <p className="text-sm text-muted">Signed in as</p>
-          <p className="truncate text-lg">{session?.user.email}</p>
-        </section>
+        {active ? (
+          <Link
+            to={`/log/session/${active.id}`}
+            className="block rounded-3xl bg-accent p-5 text-accent-fg"
+          >
+            <p className="text-sm font-semibold opacity-80">In progress</p>
+            <p className="text-2xl font-bold">{sessionTitle(active)}</p>
+            <p className="mt-1 font-semibold">Resume ›</p>
+          </Link>
+        ) : (
+          <Button
+            className="h-16 text-xl"
+            onClick={async () => {
+              const id = await startSession()
+              void navigate(`/log/session/${id}`)
+            }}
+          >
+            Start workout
+          </Button>
+        )}
 
-        <section className="grid grid-cols-2 gap-3">
-          <Stat
-            label="Exercises (server)"
-            value={pull.kind === 'ok' ? pull.count : pull.kind === 'loading' ? '…' : '—'}
-          />
-          <Stat label="Cached offline" value={localCount ?? '…'} />
-        </section>
-        {pull.kind === 'error' && (
-          <p className="text-sm text-danger">
-            Couldn't reach the server ({pull.message}). Showing cached data.
-          </p>
+        {last && (
+          <Link to={`/log/session/${last.session.id}`} className="block rounded-2xl bg-surface p-4">
+            <p className="text-xs font-semibold tracking-wide text-muted uppercase">Last workout</p>
+            <p className="mt-1 font-bold">{sessionTitle(last.session)}</p>
+            <p className="text-sm text-muted">
+              {new Intl.DateTimeFormat('en-GB', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              }).format(new Date(last.session.started_at))}{' '}
+              · {formatDuration(last.session.started_at, last.session.ended_at)} · {last.setCount}{' '}
+              sets
+            </p>
+          </Link>
         )}
 
         <ComingSoon phase="Phase 3">
@@ -58,14 +68,5 @@ export function TodayScreen() {
         </ComingSoon>
       </div>
     </>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl bg-surface p-4">
-      <p className="text-3xl font-bold tabular-nums">{value}</p>
-      <p className="mt-1 text-sm text-muted">{label}</p>
-    </div>
   )
 }

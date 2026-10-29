@@ -20,5 +20,11 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": false
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "pwa-assets.config.ts", "scripts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "pwa-assets.config.ts",
+    "scripts",
+    "vitest.integration.config.ts"
+  ]
 }

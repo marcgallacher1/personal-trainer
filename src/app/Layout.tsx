@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router'
+import { SyncPill } from '../components/SyncPill'
+import { ToastHost } from '../components/Toast'
 import { TabBar } from './TabBar'
 
 export function Layout() {
@@ -17,9 +19,13 @@ export function Layout() {
 
   return (
     <div className="min-h-full pt-safe">
-      <main className="mx-auto max-w-xl px-safe pt-4 pb-28">
+      <main className="mx-auto max-w-xl px-safe pt-2 pb-28">
+        <div className="flex h-9 justify-end">
+          <SyncPill />
+        </div>
         <Outlet />
       </main>
+      <ToastHost />
       <TabBar />
     </div>
   )

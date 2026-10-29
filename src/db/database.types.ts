@@ -66,6 +66,7 @@ export type Database = {
       }
       exercise_muscles: {
         Row: {
+          deleted_at: string | null
           exercise_id: string
           muscle_id: string
           updated_at: string
@@ -73,6 +74,7 @@ export type Database = {
           weight: number
         }
         Insert: {
+          deleted_at?: string | null
           exercise_id: string
           muscle_id: string
           updated_at?: string
@@ -80,6 +82,7 @@ export type Database = {
           weight: number
         }
         Update: {
+          deleted_at?: string | null
           exercise_id?: string
           muscle_id?: string
           updated_at?: string

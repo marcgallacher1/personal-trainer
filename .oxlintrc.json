@@ -17,7 +17,8 @@
       {
         "allow": ["**/*.css"]
       }
-    ]
+    ],
+    "react/capitalized-calls": "off"
   },
   "ignorePatterns": ["dist", "dev-dist", "supabase/functions"]
 }

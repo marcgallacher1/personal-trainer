@@ -1,6 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { supabaseConfigured } from '../db/supabase'
+import { claimLocalData } from '../db/sync'
+import { startSyncLoop } from '../db/syncController'
+import { setCurrentUserId } from '../db/user'
+import { ExerciseDetailScreen } from '../features/exercises/ExerciseDetailScreen'
+import { ExerciseFormScreen } from '../features/exercises/ExerciseFormScreen'
+import { LibraryScreen } from '../features/exercises/LibraryScreen'
+import { SessionScreen } from '../features/log/SessionScreen'
 import { detectPlatform, readPlatformSignals } from '../lib/platform'
 import { AuthProvider, useAuth } from '../features/auth/AuthProvider'
 import { SignInScreen } from '../features/auth/SignInScreen'
@@ -19,6 +26,11 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <TodayScreen /> },
       { path: '/log', element: <LogScreen /> },
+      { path: '/log/session/:id', element: <SessionScreen /> },
+      { path: '/exercises', element: <LibraryScreen /> },
+      { path: '/exercises/new', element: <ExerciseFormScreen /> },
+      { path: '/exercises/:id', element: <ExerciseDetailScreen /> },
+      { path: '/exercises/:id/edit', element: <ExerciseFormScreen /> },
       { path: '/progress', element: <ProgressScreen /> },
       { path: '/plans', element: <PlansScreen /> },
       { path: '/more', element: <MoreScreen /> },
@@ -58,6 +70,25 @@ function Gate() {
   }
   if (loading) return null
   if (!session) return <SignInScreen />
+  return <SignedIn userId={session.user.id} />
+}
+
+/** Binds local data to the signed-in user and runs background sync while signed in. */
+function SignedIn({ userId }: { userId: string }) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    setCurrentUserId(userId)
+    let stop: (() => void) | undefined
+    void claimLocalData(userId).then(() => {
+      setReady(true)
+      stop = startSyncLoop()
+    })
+    return () => {
+      stop?.()
+      setCurrentUserId(null)
+    }
+  }, [userId])
+  if (!ready) return null
   return <RouterProvider router={router} />
 }
 
