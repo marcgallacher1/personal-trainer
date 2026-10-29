@@ -41,6 +41,15 @@ body,
   height: 100%;
 }
 
+/*
+ * iOS standalone + black-translucent status bar: the initial viewport is short by the top safe area,
+ * leaving a gap under the fixed tab bar until the first scroll. Extending the root by that inset fixes it.
+ */
+html {
+  min-height: calc(100% + env(safe-area-inset-top));
+  background: var(--color-bg);
+}
+
 body {
   margin: 0;
   background: var(--color-bg);
