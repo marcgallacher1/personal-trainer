@@ -149,8 +149,19 @@ function GoalsForm({ profile, targets }: { profile: Profile; targets: MuscleTarg
           {(muscles ?? []).map((m) => {
             const state = draft.muscles[m.id] ?? 'normal'
             return (
-              <li key={m.id} className="flex items-center gap-2 px-4 py-2">
-                <span className="min-w-0 flex-1 truncate">{m.name}</span>
+              <li
+                key={m.id}
+                className={`flex items-center gap-2 px-4 py-2 transition-colors ${
+                  state === 'paused' ? 'bg-surface-2/60' : ''
+                }`}
+              >
+                <span
+                  className={`min-w-0 flex-1 truncate ${
+                    state === 'paused' ? 'text-muted line-through decoration-muted/50' : ''
+                  }`}
+                >
+                  {m.name}
+                </span>
                 <div className="grid grid-cols-3 gap-1 rounded-lg bg-surface-2 p-0.5 text-xs font-semibold">
                   {(['normal', 'priority', 'paused'] as const).map((s) => (
                     <button
