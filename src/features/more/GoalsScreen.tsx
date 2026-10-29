@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Stepper } from '../../components/Stepper'
+import { showToast } from '../../components/Toast'
 import { useMuscles } from '../../db/queries'
-import { setMuscleFlags, updateProfile, useMuscleTargets, useProfile } from '../plans/data'
+import { save, type Change } from '../../db/write'
+import { useMuscleTargets, useProfile, type MuscleTarget, type Profile } from '../plans/data'
 
 const BODY_GOALS = [
   { id: 'bulk', name: 'Bulk', hint: 'Calorie surplus to gain size, accepting some fat.' },
@@ -17,12 +20,32 @@ const FOCUS = [
   { id: 'general', name: 'General fitness', hint: 'A balanced mix.' },
 ] as const
 
+type MuscleState = 'normal' | 'priority' | 'paused'
+
+interface Draft {
+  body_goal: string | null
+  goal: string | null
+  sessions_per_week: number
+  muscles: Record<string, MuscleState>
+}
+
+const stateOf = (t: MuscleTarget): MuscleState =>
+  t.paused ? 'paused' : t.priority ? 'priority' : 'normal'
+
+function toDraft(profile: Profile, targets: MuscleTarget[]): Draft {
+  return {
+    body_goal: profile.body_goal,
+    goal: profile.goal,
+    sessions_per_week: profile.sessions_per_week,
+    muscles: Object.fromEntries(targets.map((t) => [t.muscle_id, stateOf(t)])),
+  }
+}
+
 export function GoalsScreen() {
   const profile = useProfile()
-  const muscles = useMuscles()
   const targets = useMuscleTargets()
 
-  if (profile === undefined) return null
+  if (profile === undefined || targets === undefined) return null
   if (profile === null) {
     return (
       <p className="py-12 text-center text-muted">
@@ -30,11 +53,46 @@ export function GoalsScreen() {
       </p>
     )
   }
+  // Re-key on save so the draft resets to the saved values
+  return <GoalsForm key={profile.updated_at} profile={profile} targets={targets} />
+}
 
-  const byMuscle = new Map((targets ?? []).map((t) => [t.muscle_id, t]))
+function GoalsForm({ profile, targets }: { profile: Profile; targets: MuscleTarget[] }) {
+  const muscles = useMuscles()
+  const [saved] = useState(() => toDraft(profile, targets))
+  const [draft, setDraft] = useState<Draft>(saved)
+  const [busy, setBusy] = useState(false)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+
+  async function onSave() {
+    setBusy(true)
+    const changes: Change[] = [
+      {
+        table: 'profiles',
+        row: {
+          ...profile,
+          body_goal: draft.body_goal,
+          goal: draft.goal,
+          sessions_per_week: draft.sessions_per_week,
+        },
+      },
+    ]
+    for (const t of targets) {
+      const next = draft.muscles[t.muscle_id] ?? 'normal'
+      if (next !== stateOf(t)) {
+        changes.push({
+          table: 'muscle_targets',
+          row: { ...t, priority: next === 'priority', paused: next === 'paused' },
+        })
+      }
+    }
+    await save(changes)
+    setBusy(false)
+    showToast({ message: 'Goals saved' })
+  }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20">
       <div>
         <Link to="/more" className="text-sm text-accent">
           ‹ More
@@ -52,8 +110,8 @@ export function GoalsScreen() {
               key={g.id}
               name={g.name}
               hint={g.hint}
-              selected={profile.body_goal === g.id}
-              onClick={() => void updateProfile(profile, { body_goal: g.id })}
+              selected={draft.body_goal === g.id}
+              onClick={() => setDraft({ ...draft, body_goal: g.id })}
             />
           ))}
         </div>
@@ -66,8 +124,8 @@ export function GoalsScreen() {
               key={f.id}
               name={f.name}
               hint={f.hint}
-              selected={profile.goal === f.id}
-              onClick={() => void updateProfile(profile, { goal: f.id })}
+              selected={draft.goal === f.id}
+              onClick={() => setDraft({ ...draft, goal: f.id })}
             />
           ))}
         </div>
@@ -76,12 +134,10 @@ export function GoalsScreen() {
       <Section title="Workouts per week" hint="Your weekly target on the Today screen.">
         <Stepper
           label="workouts per week"
-          value={profile.sessions_per_week}
+          value={draft.sessions_per_week}
           step={1}
           min={1}
-          onChange={(v) =>
-            void updateProfile(profile, { sessions_per_week: Math.min(14, Math.max(1, v)) })
-          }
+          onChange={(v) => setDraft({ ...draft, sessions_per_week: Math.min(14, Math.max(1, v)) })}
         />
       </Section>
 
@@ -91,8 +147,7 @@ export function GoalsScreen() {
       >
         <ul className="flex flex-col divide-y divide-border rounded-2xl bg-surface">
           {(muscles ?? []).map((m) => {
-            const t = byMuscle.get(m.id)
-            const state = t?.paused ? 'paused' : t?.priority ? 'priority' : 'normal'
+            const state = draft.muscles[m.id] ?? 'normal'
             return (
               <li key={m.id} className="flex items-center gap-2 px-4 py-2">
                 <span className="min-w-0 flex-1 truncate">{m.name}</span>
@@ -101,22 +156,15 @@ export function GoalsScreen() {
                     <button
                       key={s}
                       type="button"
-                      disabled={!t}
                       aria-pressed={state === s}
                       onClick={() =>
-                        t &&
-                        void setMuscleFlags(t, {
-                          priority: s === 'priority',
-                          paused: s === 'paused',
-                        })
+                        setDraft({ ...draft, muscles: { ...draft.muscles, [m.id]: s } })
                       }
                       className={`h-8 rounded-md px-2 ${
                         state === s
                           ? s === 'priority'
                             ? 'bg-accent text-accent-fg'
-                            : s === 'paused'
-                              ? 'bg-bg text-muted shadow-sm'
-                              : 'bg-bg shadow-sm'
+                            : 'bg-bg shadow-sm'
                           : 'text-muted'
                       }`}
                     >
@@ -129,6 +177,29 @@ export function GoalsScreen() {
           })}
         </ul>
       </Section>
+
+      {/* Pinned above the tab bar */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 border-t border-border bg-bg/95 px-safe py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-xl gap-2">
+          {dirty && (
+            <button
+              type="button"
+              className="h-12 rounded-xl bg-surface-2 px-4 font-semibold"
+              onClick={() => setDraft(saved)}
+            >
+              Discard
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!dirty || busy}
+            onClick={() => void onSave()}
+            className="h-12 flex-1 rounded-xl bg-accent text-lg font-bold text-accent-fg disabled:bg-surface-2 disabled:text-muted"
+          >
+            {busy ? 'Saving…' : dirty ? 'Save goals' : 'Saved ✓'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
