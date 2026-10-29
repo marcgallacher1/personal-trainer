@@ -137,7 +137,7 @@ export function SetEditor({
           <button
             type="button"
             disabled={invalid}
-            className="h-14 flex-1 rounded-2xl bg-surface-2 font-semibold active:scale-[0.98] disabled:opacity-40"
+            className="h-14 flex-1 basis-0 rounded-2xl bg-surface-2 text-lg font-semibold active:scale-[0.98] disabled:opacity-40"
             onClick={() => onSecondary(v)}
           >
             {secondaryLabel}
@@ -146,7 +146,7 @@ export function SetEditor({
         <button
           type="button"
           disabled={invalid}
-          className="h-14 flex-[1.4] rounded-2xl bg-accent text-lg font-bold text-accent-fg active:scale-[0.98] disabled:opacity-40"
+          className="h-14 flex-1 basis-0 rounded-2xl bg-accent text-lg font-bold text-accent-fg active:scale-[0.98] disabled:opacity-40"
           onClick={() => onSubmit(v)}
         >
           {submitLabel}

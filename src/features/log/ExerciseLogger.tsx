@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
 import {
@@ -44,6 +44,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
   /** The set just logged, so we can highlight it and confirm what happened. */
   const [justLogged, setJustLogged] = useState<{ id: string; text: string } | null>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const logged = sets.map(asLogged)
   const previous = history ? previousPerformance(history.map(asLogged), se.session_id) : null
@@ -63,6 +64,8 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
       onClose()
     } else {
       setJustLogged({ id, text })
+      // Back to the top so the logged-sets table and confirmation are in view
+      bodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -78,6 +81,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   return (
     <Sheet
       open
+      bodyRef={bodyRef}
       title={exercise?.name ?? 'Exercise'}
       subtitle={
         previous

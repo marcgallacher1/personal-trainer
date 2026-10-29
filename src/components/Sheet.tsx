@@ -1,7 +1,10 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode, type Ref } from 'react'
 
 interface Props {
   open: boolean
+  /** Ref to the scrolling body, e.g. to scroll back to the top */
+  bodyRef?: Ref<HTMLDivElement>
+
   title: string
   /** Optional line under the title */
   subtitle?: ReactNode
@@ -16,6 +19,7 @@ interface Props {
 /** Full-height modal sheet (below the status bar) with a scrolling body and optional pinned footer. */
 export function Sheet({
   open,
+  bodyRef,
   title,
   subtitle,
   onClose,
@@ -55,7 +59,10 @@ export function Sheet({
             {closeLabel}
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-safe py-4">
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-safe py-4"
+        >
           {children}
         </div>
         {footer && (
