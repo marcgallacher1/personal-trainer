@@ -18,6 +18,7 @@ function set(
     weight_kg,
     reps,
     rir: null,
+    duration_seconds: null,
     set_type: 'working',
     completed_at,
     deleted_at: null,
@@ -59,8 +60,8 @@ describe('remainingDrafts', () => {
 
   it('offers the sets not yet repeated today', () => {
     expect(remainingDrafts(prev, today)).toEqual([
-      { weight_kg: 80, reps: 8, set_type: 'working' },
-      { weight_kg: 80, reps: 7, set_type: 'working' },
+      { weight_kg: 80, reps: 8, duration_seconds: null, set_type: 'working' },
+      { weight_kg: 80, reps: 7, duration_seconds: null, set_type: 'working' },
     ])
   })
 
@@ -75,11 +76,26 @@ describe('nextDraft', () => {
 
   it("repeats today's last set", () => {
     const t = [...today, set('C', 1, 82.5, 8, '2026-10-15T18:05:00Z')]
-    expect(nextDraft(prev, t)).toEqual({ weight_kg: 82.5, reps: 8, set_type: 'working' })
+    expect(nextDraft(prev, t)).toEqual({
+      weight_kg: 82.5,
+      reps: 8,
+      duration_seconds: null,
+      set_type: 'working',
+    })
   })
 
   it("falls back to last time's first working set, then blank", () => {
-    expect(nextDraft(prev, [])).toEqual({ weight_kg: 80, reps: 8, set_type: 'working' })
-    expect(nextDraft(null, [])).toEqual({ weight_kg: 0, reps: 0, set_type: 'working' })
+    expect(nextDraft(prev, [])).toEqual({
+      weight_kg: 80,
+      reps: 8,
+      duration_seconds: null,
+      set_type: 'working',
+    })
+    expect(nextDraft(null, [])).toEqual({
+      weight_kg: 0,
+      reps: 0,
+      duration_seconds: null,
+      set_type: 'working',
+    })
   })
 })

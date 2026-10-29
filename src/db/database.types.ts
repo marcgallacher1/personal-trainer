@@ -174,6 +174,7 @@ export type Database = {
           id: string
           is_compound: boolean
           is_custom: boolean
+          log_type: string
           name: string
           notes: string | null
           pattern: string
@@ -188,6 +189,7 @@ export type Database = {
           id?: string
           is_compound?: boolean
           is_custom?: boolean
+          log_type?: string
           name: string
           notes?: string | null
           pattern: string
@@ -202,6 +204,7 @@ export type Database = {
           id?: string
           is_compound?: boolean
           is_custom?: boolean
+          log_type?: string
           name?: string
           notes?: string | null
           pattern?: string
@@ -1086,6 +1089,7 @@ export type Database = {
           completed_at: string
           created_at: string
           deleted_at: string | null
+          duration_seconds: number | null
           exercise_id: string
           id: string
           is_pr: boolean
@@ -1105,6 +1109,7 @@ export type Database = {
           completed_at?: string
           created_at?: string
           deleted_at?: string | null
+          duration_seconds?: number | null
           exercise_id: string
           id?: string
           is_pr?: boolean
@@ -1124,6 +1129,7 @@ export type Database = {
           completed_at?: string
           created_at?: string
           deleted_at?: string | null
+          duration_seconds?: number | null
           exercise_id?: string
           id?: string
           is_pr?: boolean

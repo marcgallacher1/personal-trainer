@@ -26,7 +26,9 @@ import {
 } from './actions'
 import { cardioEmoji, cardioName, cardioSummary } from '../../lib/cardio'
 import { CardioLogger } from './CardioLogger'
-import { ExerciseLogger, kg } from './ExerciseLogger'
+import { asLogType, formatSet } from '../../lib/logging/logTypes'
+import type { LogType } from '../../lib/logging/types'
+import { ExerciseLogger } from './ExerciseLogger'
 import { formatDuration, sessionTitle } from './format'
 
 /** Workout overview: one summary card per exercise; tap a card to log it in a full-screen modal. */
@@ -142,6 +144,7 @@ export function SessionScreen() {
                 <div className="min-w-0 flex-1">
                   <SummaryCard
                     name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
+                    logType={asLogType(byId.get(se.exercise_id)?.log_type)}
                     sets={allSets.filter((s) => s.session_exercise_id === se.id)}
                     notes={se.notes}
                     onOpen={() => {
@@ -311,11 +314,13 @@ export function SessionScreen() {
 
 function SummaryCard({
   name,
+  logType,
   sets,
   notes,
   onOpen,
 }: {
   name: string
+  logType: LogType
   sets: SetRow[]
   notes: string | null
   onOpen: () => void
@@ -337,7 +342,7 @@ function SummaryCard({
           {working.length === 0
             ? 'No sets yet · tap to log'
             : `${working.length} set${working.length === 1 ? '' : 's'} · ${working
-                .map((s) => `${kg(s.weight_kg)}×${s.reps}`)
+                .map((s) => formatSet(s, logType))
                 .join(' · ')}`}
         </span>
         {notes && <span className="mt-0.5 block truncate text-xs text-muted">✎ {notes}</span>}

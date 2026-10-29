@@ -1,3 +1,4 @@
+import type { LogType } from '../logging/types'
 import type { MuscleId } from './muscles'
 
 export type Equipment =
@@ -29,6 +30,8 @@ export interface ExerciseSeed {
   pattern: MovementPattern
   compound: boolean
   restSeconds: number
+  /** How sets are logged (weight × reps, bodyweight, assisted, timed…) */
+  logType: LogType
   /** Original name used to derive the stable seed ID, when the display name has since changed. */
   idName?: string
   /** Primary movers, weight 1.0 */
@@ -320,6 +323,34 @@ const CORE: Row[] = [
   ['Dragon Flag', 'bodyweight', 'core', ['abs'], ['obliques']],
 ]
 
+/**
+ * Logging type exceptions. Everything else: bodyweight equipment → bodyweight × reps
+ * (with optional added weight), all other equipment → weight × reps.
+ */
+const LOG_TYPE_OVERRIDES: Record<string, LogType> = {
+  // Timed holds
+  Plank: 'duration',
+  'Side Plank': 'duration',
+  'Dead Hang': 'duration',
+  'Copenhagen Plank': 'duration',
+  // Loaded carries: weight for time
+  "Farmer's Walk": 'weight_duration',
+  'Suitcase Carry': 'weight_duration',
+  'Trap Bar Carry': 'weight_duration',
+  // Machine assistance (less = harder)
+  'Assisted Pull-Up': 'assisted_reps',
+  // Bodyweight movements that aren't listed with bodyweight equipment
+  'Ab Wheel Rollout': 'bodyweight_reps',
+  'Glute-Ham Raise': 'bodyweight_reps',
+  'Band Pull-Apart': 'bodyweight_reps',
+}
+
+function logTypeFor(name: string, equipment: Equipment): LogType {
+  return (
+    LOG_TYPE_OVERRIDES[name] ?? (equipment === 'bodyweight' ? 'bodyweight_reps' : 'weight_reps')
+  )
+}
+
 function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSeed[] {
   return rows.map(([name, equipment, pattern, primary, secondary]) => ({
     name,
@@ -327,6 +358,7 @@ function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSee
     pattern,
     compound,
     restSeconds,
+    logType: logTypeFor(name, equipment),
     primary,
     secondary,
   }))

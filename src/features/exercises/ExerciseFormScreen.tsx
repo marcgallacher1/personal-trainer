@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { useExercise, useExerciseMuscleMap, useMuscles, type Exercise } from '../../db/queries'
+import { asLogType, LOG_TYPE_INFO } from '../../lib/logging/logTypes'
+import { LOG_TYPES } from '../../lib/logging/types'
 import type { Equipment, MovementPattern } from '../../lib/seed/exercises'
 import { EQUIPMENT_LABELS, PATTERN_LABELS } from '../../lib/seed/labels'
 import { addExercise } from '../log/actions'
@@ -25,6 +27,7 @@ export function ExerciseFormScreen() {
         name: existing.name,
         equipment: existing.equipment as Equipment,
         pattern: existing.pattern as MovementPattern,
+        logType: asLogType(existing.log_type),
         muscles: Object.fromEntries(
           (muscleMap?.get(existing.id) ?? []).map((m) => [
             m.muscle_id,
@@ -32,7 +35,7 @@ export function ExerciseFormScreen() {
           ]),
         ),
       }
-    : { name: '', equipment: 'machine', pattern: 'isolation', muscles: {} }
+    : { name: '', equipment: 'machine', pattern: 'isolation', logType: 'weight_reps', muscles: {} }
 
   return <Form key={existing?.id ?? 'new'} initial={initial} existing={existing ?? undefined} />
 }
@@ -82,7 +85,23 @@ function Form({ initial, existing }: { initial: ExerciseInput; existing?: Exerci
 
       <Field title="Equipment">
         {(Object.keys(EQUIPMENT_LABELS) as Equipment[]).map((k) => (
-          <Chip key={k} active={v.equipment === k} onClick={() => setV({ ...v, equipment: k })}>
+          <Chip
+            key={k}
+            active={v.equipment === k}
+            onClick={() =>
+              setV({
+                ...v,
+                equipment: k,
+                // Sensible default when switching to/from bodyweight; still changeable below
+                logType:
+                  k === 'bodyweight'
+                    ? 'bodyweight_reps'
+                    : v.logType === 'bodyweight_reps'
+                      ? 'weight_reps'
+                      : v.logType,
+              })
+            }
+          >
             {EQUIPMENT_LABELS[k]}
           </Chip>
         ))}
@@ -94,6 +113,27 @@ function Form({ initial, existing }: { initial: ExerciseInput; existing?: Exerci
             {PATTERN_LABELS[k]}
           </Chip>
         ))}
+      </Field>
+
+      <Field title="How you log it">
+        <div className="flex w-full flex-col gap-2">
+          {LOG_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={v.logType === t}
+              onClick={() => setV({ ...v, logType: t })}
+              className={`flex min-h-12 flex-col justify-center rounded-xl px-4 py-2 text-left ${
+                v.logType === t ? 'bg-accent text-accent-fg' : 'bg-surface'
+              }`}
+            >
+              <span className="font-semibold">{LOG_TYPE_INFO[t].name}</span>
+              <span className={`text-xs ${v.logType === t ? 'opacity-80' : 'text-muted'}`}>
+                {LOG_TYPE_INFO[t].description}
+              </span>
+            </button>
+          ))}
+        </div>
       </Field>
 
       <Field

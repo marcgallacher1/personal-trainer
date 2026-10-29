@@ -10,7 +10,14 @@ import {
 } from '../../db/queries'
 import { describePR } from '../../lib/logging/pr'
 import { nextDraft, previousPerformance, remainingDrafts } from '../../lib/logging/previous'
-import type { SetType } from '../../lib/logging/types'
+import {
+  asLogType,
+  columnHeadings,
+  formatEffort,
+  formatLoad,
+  formatSet,
+} from '../../lib/logging/logTypes'
+import { isTimed, type SetType } from '../../lib/logging/types'
 import {
   deleteSet,
   logSet,
@@ -53,11 +60,16 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   const numbers = setNumbers(logged.map((s) => s.set_type))
   const nextNumber = numbers.filter(Boolean).length + 1
   const editing = sets.find((s) => s.id === editingSetId)
+  const logType = asLogType(exercise?.log_type)
+  const timed = isTimed(logType)
+  const heads = columnHeadings(logType)
+  // Timed sets have no RIR column
+  const cols = timed ? 'grid-cols-[4.5rem_1fr_1fr]' : 'grid-cols-[4.5rem_1fr_1fr_3.5rem]'
 
   async function submitNew(v: EditorValue, close: boolean) {
-    const { id, prs } = await logSet(se, v, v.rir)
+    const { id, prs } = await logSet(se, v, v.rir, logType)
     const label = v.set_type === 'warmup' ? 'Warm-up' : `Set ${nextNumber}`
-    const text = `${label} logged · ${kg(v.weight_kg)} kg × ${v.reps}`
+    const text = `${label} logged · ${formatSet(v, logType)}`
     if (prs[0]) showToast({ message: describePR(prs[0]), tone: 'celebrate' })
     if (close) {
       if (!prs[0]) showToast({ message: `✓ ${text}` })
@@ -86,7 +98,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
       subtitle={
         previous
           ? `Last time (${shortDate(previous.date)}): ${previous.sets
-              .map((s) => `${kg(s.weight_kg)} kg × ${s.reps}`)
+              .map((s) => formatSet(s, logType))
               .join(', ')}`
           : 'First time logging this exercise'
       }
@@ -113,11 +125,13 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
             </p>
           ) : (
             <div className="overflow-hidden rounded-2xl bg-surface">
-              <div className="grid grid-cols-[4.5rem_1fr_1fr_3.5rem] gap-2 border-b border-border px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase">
+              <div
+                className={`grid ${cols} gap-2 border-b border-border px-4 py-2 text-xs font-semibold tracking-wide text-muted uppercase`}
+              >
                 <span>Set</span>
-                <span>Weight</span>
-                <span>Reps</span>
-                <span className="text-right">RIR</span>
+                <span>{heads.load}</span>
+                <span>{heads.effort}</span>
+                {!timed && <span className="text-right">RIR</span>}
               </div>
               {sets.map((s, i) => {
                 const type = s.set_type as SetType
@@ -127,7 +141,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                     key={s.id}
                     type="button"
                     onClick={() => setEditingSetId(s.id)}
-                    className={`grid h-14 w-full grid-cols-[4.5rem_1fr_1fr_3.5rem] items-center gap-2 px-4 text-left active:bg-surface-2 ${
+                    className={`grid h-14 w-full ${cols} items-center gap-2 px-4 text-left active:bg-surface-2 ${
                       editingSetId === s.id ? 'bg-accent/10' : ''
                     } ${justLogged?.id === s.id ? 'animate-[flash_1.8s_ease-out]' : ''} ${i > 0 ? 'border-t border-border' : ''}`}
                   >
@@ -142,20 +156,22 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                         </span>
                       )}
                     </span>
-                    <span className="text-lg font-semibold tabular-nums">
-                      {kg(s.weight_kg)} <span className="text-sm font-normal text-muted">kg</span>
+                    <span className="truncate text-lg font-semibold tabular-nums">
+                      {formatLoad(s, logType)}
                     </span>
                     <span className="text-lg font-semibold tabular-nums">
-                      {s.reps}
+                      {formatEffort(s, logType)}
                       {s.is_pr && (
                         <span className="ml-2" aria-label="Personal best">
                           🏆
                         </span>
                       )}
                     </span>
-                    <span className="text-right text-muted tabular-nums">
-                      {s.rir === null ? '–' : s.rir === 4 ? '4+' : s.rir}
-                    </span>
+                    {!timed && (
+                      <span className="text-right text-muted tabular-nums">
+                        {s.rir === null ? '–' : s.rir === 4 ? '4+' : s.rir}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -179,10 +195,12 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
         {editing ? (
           <SetEditor
             key={editing.id}
+            logType={logType}
             heading={`Edit set ${numbers[sets.indexOf(editing)] || ''}`.trim()}
             initial={{
               weight_kg: editing.weight_kg,
               reps: editing.reps,
+              duration_seconds: editing.duration_seconds,
               set_type: editing.set_type as SetType,
               rir: editing.rir,
             }}
@@ -192,6 +210,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
               void updateSet(editing, {
                 weight_kg: v.weight_kg,
                 reps: v.reps,
+                duration_seconds: v.duration_seconds,
                 set_type: v.set_type,
                 rir: v.rir,
               })
@@ -210,6 +229,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
           <SetEditor
             // Re-initialise with the next prefilled values after each logged set
             key={`next-${sets.length}-${previous?.sessionId ?? 'none'}`}
+            logType={logType}
             heading={draft.set_type === 'warmup' ? 'Next: warm-up set' : `Next: set ${nextNumber}`}
             initial={{ ...draft, rir: null }}
             submitLabel={draft.set_type === 'warmup' ? 'Log warm-up' : `Log set ${nextNumber}`}
@@ -224,7 +244,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
             Still to match from last time:{' '}
             {drafts
               .slice(1)
-              .map((d) => `${kg(d.weight_kg)} kg × ${d.reps}`)
+              .map((d) => formatSet(d, logType))
               .join(', ')}
           </p>
         )}

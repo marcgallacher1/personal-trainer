@@ -35,18 +35,26 @@ describe('offline log → push → wipe → pull', () => {
     const s1 = await startSession()
     await addExercise(s1, bench)
     const se1 = (await db.session_exercises.where('session_id').equals(s1).toArray())[0]!
-    await logSet(se1, { weight_kg: 60, reps: 10, set_type: 'warmup' }, null)
-    await logSet(se1, { weight_kg: 100, reps: 5, set_type: 'working' }, 2)
-    await logSet(se1, { weight_kg: 100, reps: 5, set_type: 'working' }, 1)
+    await logSet(se1, { weight_kg: 60, reps: 10, duration_seconds: null, set_type: 'warmup' }, null)
+    await logSet(se1, { weight_kg: 100, reps: 5, duration_seconds: null, set_type: 'working' }, 2)
+    await logSet(se1, { weight_kg: 100, reps: 5, duration_seconds: null, set_type: 'working' }, 1)
     await finishSession((await db.sessions.get(s1))!)
 
     // Session 2 beats it → PR
     const s2 = await startSession()
     await addExercise(s2, bench)
     const se2 = (await db.session_exercises.where('session_id').equals(s2).toArray())[0]!
-    const { prs } = await logSet(se2, { weight_kg: 105, reps: 5, set_type: 'working' }, 1)
+    const { prs } = await logSet(
+      se2,
+      { weight_kg: 105, reps: 5, duration_seconds: null, set_type: 'working' },
+      1,
+    )
     expect(prs.map((p) => p.kind)).toContain('e1rm')
-    const { prs: extra } = await logSet(se2, { weight_kg: 40, reps: 3, set_type: 'working' }, null)
+    const { prs: extra } = await logSet(
+      se2,
+      { weight_kg: 40, reps: 3, duration_seconds: null, set_type: 'working' },
+      null,
+    )
     expect(extra).toEqual([])
     const toDelete = (await db.sets.where('session_id').equals(s2).toArray()).find(
       (s) => s.weight_kg === 40,
@@ -58,6 +66,7 @@ describe('offline log → push → wipe → pull', () => {
       name: `Test Curl ${Date.now()}`,
       equipment: 'cable',
       pattern: 'isolation',
+      logType: 'weight_reps',
       muscles: { biceps: 'primary', forearms: 'secondary' },
     })
 
@@ -71,15 +80,30 @@ describe('offline log → push → wipe → pull', () => {
       notes: null,
     })
 
+    // Timed hold: plank is seeded as a duration exercise
+    const plank = (await db.exercises.toArray()).find((e) => e.name === 'Plank')!
+    expect(plank.log_type).toBe('duration')
+    await addExercise(s2, plank)
+    const sePlank = (await db.session_exercises.where('session_id').equals(s2).toArray()).find(
+      (se) => se.exercise_id === plank.id,
+    )!
+    await logSet(
+      sePlank,
+      { weight_kg: 0, reps: 0, duration_seconds: 75, set_type: 'working' },
+      null,
+      'duration',
+    )
+
     expect(await db.outbox.count()).toBeGreaterThan(0)
     await push()
     expect(await db.outbox.count()).toBe(0)
 
     // Server has it all, scoped to this user by RLS
     const { data: serverSets } = await supabase.from('sets').select('*').in('session_id', [s1, s2])
-    expect(serverSets).toHaveLength(5)
+    expect(serverSets).toHaveLength(6)
     expect(serverSets!.filter((s) => s.deleted_at)).toHaveLength(1)
     expect(serverSets!.find((s) => s.weight_kg === 105)?.is_pr).toBe(true)
+    expect(serverSets!.find((s) => s.exercise_id === plank.id)?.duration_seconds).toBe(75)
     const { data: mapping } = await supabase
       .from('exercise_muscles')
       .select('*')
@@ -101,8 +125,8 @@ describe('offline log → push → wipe → pull', () => {
     expect(await db.sets.count()).toBe(0)
     await pull()
     const sets = (await db.sets.toArray()).filter((s) => [s1, s2].includes(s.session_id))
-    expect(sets).toHaveLength(5)
-    expect(sets.filter((s) => !s.deleted_at)).toHaveLength(4)
+    expect(sets).toHaveLength(6)
+    expect(sets.filter((s) => !s.deleted_at)).toHaveLength(5)
     expect((await db.sessions.get(s1))?.ended_at).not.toBeNull()
     expect((await db.exercises.get(custom.id))?.is_custom).toBe(true)
     expect(await db.exercises.count()).toBeGreaterThanOrEqual(141)

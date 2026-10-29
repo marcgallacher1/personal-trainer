@@ -4,7 +4,7 @@ import { PageTitle } from '../../app/Layout'
 import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
 import { useExercise, useExerciseHistory, useExerciseMuscleMap, useMuscles } from '../../db/queries'
-import { e1rm } from '../../lib/analysis/e1rm'
+import { asLogType, formatSet, headlineStats, LOG_TYPE_INFO } from '../../lib/logging/logTypes'
 import { EQUIPMENT_LABELS, label, PATTERN_LABELS } from '../../lib/seed/labels'
 import { deleteCustomExercise } from './actions'
 
@@ -31,12 +31,9 @@ export function ExerciseDetailScreen() {
 
   const mapping = (muscleMap?.get(exercise.id) ?? []).toSorted((a, b) => b.weight - a.weight)
   const name = (m: string) => muscles?.find((x) => x.id === m)?.name ?? m
+  const logType = asLogType(exercise.log_type)
   const sets = (history ?? []).filter((s) => !s.deleted_at && s.set_type !== 'warmup')
-  const best = sets.reduce<{ value: number; w: number; r: number } | null>((acc, s) => {
-    const v = e1rm(s.weight_kg, s.reps)
-    return v !== null && (!acc || v > acc.value) ? { value: v, w: s.weight_kg, r: s.reps } : acc
-  }, null)
-  const heaviest = sets.reduce((m, s) => Math.max(m, s.weight_kg), 0)
+  const stats = headlineStats(sets, logType)
 
   // Recent sessions, newest first
   const bySession = new Map<string, typeof sets>()
@@ -56,6 +53,7 @@ export function ExerciseDetailScreen() {
           {label(EQUIPMENT_LABELS, exercise.equipment)} · {label(PATTERN_LABELS, exercise.pattern)}
           {exercise.is_custom && ' · custom'}
         </p>
+        <p className="text-sm text-muted">Logged as: {LOG_TYPE_INFO[logType].name}</p>
       </div>
 
       <section className="rounded-2xl bg-surface p-4">
@@ -78,16 +76,15 @@ export function ExerciseDetailScreen() {
       </section>
 
       <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-surface p-4">
-          <p className="text-2xl font-bold tabular-nums">
-            {best ? `${Math.round(best.value * 10) / 10}` : '—'}
-          </p>
-          <p className="text-sm text-muted">Best e1RM (kg){best ? ` · ${best.w}×${best.r}` : ''}</p>
-        </div>
-        <div className="rounded-2xl bg-surface p-4">
-          <p className="text-2xl font-bold tabular-nums">{heaviest || '—'}</p>
-          <p className="text-sm text-muted">Heaviest (kg)</p>
-        </div>
+        {stats.map((s) => (
+          <div key={s.label} className="rounded-2xl bg-surface p-4">
+            <p className="text-2xl font-bold tabular-nums">{s.value}</p>
+            <p className="text-sm text-muted">
+              {s.label}
+              {s.detail ? ` · ${s.detail}` : ''}
+            </p>
+          </div>
+        ))}
       </section>
 
       {recent.length > 0 && (
@@ -108,7 +105,7 @@ export function ExerciseDetailScreen() {
                   <span className="truncate text-sm tabular-nums">
                     {[...ss]
                       .toSorted((a, b) => a.order - b.order)
-                      .map((s) => `${s.weight_kg}×${s.reps}`)
+                      .map((s) => formatSet(s, logType))
                       .join(' · ')}
                   </span>
                 </Link>

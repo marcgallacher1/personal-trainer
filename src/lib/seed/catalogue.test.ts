@@ -43,3 +43,35 @@ describe('seed catalogue', () => {
     for (const m of MUSCLE_IDS) expect(primaries.has(m), m).toBe(true)
   })
 })
+
+describe('log types', () => {
+  const byName = new Map(EXERCISES.map((e) => [e.name, e.logType]))
+
+  it('maps every override to a real exercise', () => {
+    for (const name of [
+      'Plank',
+      'Side Plank',
+      'Dead Hang',
+      'Copenhagen Plank',
+      "Farmer's Walk",
+      'Suitcase Carry',
+      'Trap Bar Carry',
+      'Assisted Pull-Up',
+      'Ab Wheel Rollout',
+      'Glute-Ham Raise',
+      'Band Pull-Apart',
+    ]) {
+      expect(byName.has(name), name).toBe(true)
+    }
+  })
+
+  it('assigns sensible types', () => {
+    expect(byName.get('Ab Wheel Rollout')).toBe('bodyweight_reps')
+    expect(byName.get('Dip')).toBe('bodyweight_reps')
+    expect(byName.get('Plank')).toBe('duration')
+    expect(byName.get("Farmer's Walk")).toBe('weight_duration')
+    expect(byName.get('Assisted Pull-Up')).toBe('assisted_reps')
+    expect(byName.get('Barbell Bench Press')).toBe('weight_reps')
+    expect(byName.get('Cable Crunch')).toBe('weight_reps')
+  })
+})

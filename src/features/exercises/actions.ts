@@ -2,6 +2,7 @@ import type { Exercise, ExerciseMuscle } from '../../db/queries'
 import { db } from '../../db/local'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, save, type Change } from '../../db/write'
+import type { LogType } from '../../lib/logging/types'
 import type { Equipment, MovementPattern } from '../../lib/seed/exercises'
 
 export type MuscleRole = 'primary' | 'secondary'
@@ -10,6 +11,7 @@ export interface ExerciseInput {
   name: string
   equipment: Equipment
   pattern: MovementPattern
+  logType: LogType
   muscles: Record<string, MuscleRole>
 }
 
@@ -29,6 +31,7 @@ export async function saveCustomExercise(
         name: input.name.trim(),
         equipment: input.equipment,
         pattern: input.pattern,
+        log_type: input.logType,
         is_compound: isCompound,
       }
     : {
@@ -37,6 +40,7 @@ export async function saveCustomExercise(
         name: input.name.trim(),
         equipment: input.equipment,
         pattern: input.pattern,
+        log_type: input.logType,
         is_compound: isCompound,
         is_custom: true,
         default_rest_seconds: isCompound ? 120 : 90,

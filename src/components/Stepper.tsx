@@ -9,11 +9,22 @@ interface Props {
   decimals?: boolean
   /** Shown instead of 0 for optional values, e.g. "–" */
   emptyLabel?: string
+  /** Display formatter, e.g. seconds → "1:30". Typing accepts plain numbers or m:ss. */
+  format?: (v: number) => string
   label: string
   onChange: (v: number) => void
 }
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100))
+
+/** "90" → 90, "1:30" → 90, "2,5" → 2.5 */
+function parse(text: string): number {
+  const t = text.trim()
+  if (t === '') return 0
+  const mmss = /^(\d+):(\d{1,2})$/.exec(t)
+  if (mmss) return Number(mmss[1]) * 60 + Number(mmss[2])
+  return Number(t.replace(',', '.'))
+}
 
 /** − value + with big tap targets. Tap the number to type a value. */
 export function Stepper({
@@ -23,14 +34,16 @@ export function Stepper({
   unit,
   decimals = false,
   emptyLabel,
+  format,
   label,
   onChange,
 }: Props) {
   const [editing, setEditing] = useState<string | null>(null)
+  const display = format ?? fmt
 
   const commit = () => {
     if (editing === null) return
-    const n = editing.trim() === '' ? 0 : Number(editing.replace(',', '.'))
+    const n = parse(editing)
     if (Number.isFinite(n))
       onChange(Math.max(min, decimals ? Math.round(n * 100) / 100 : Math.round(n)))
     setEditing(null)
@@ -49,7 +62,7 @@ export function Stepper({
       {editing !== null ? (
         <input
           autoFocus
-          inputMode={decimals ? 'decimal' : 'numeric'}
+          inputMode={decimals ? 'decimal' : format ? 'text' : 'numeric'}
           value={editing}
           onChange={(e) => setEditing(e.target.value)}
           onBlur={commit}
@@ -65,7 +78,7 @@ export function Stepper({
           {value === 0 && emptyLabel ? (
             <span className="text-muted">{emptyLabel}</span>
           ) : (
-            fmt(value)
+            display(value)
           )}
           {unit && !(value === 0 && emptyLabel) && (
             <span className="ml-0.5 text-xs font-normal text-muted">{unit}</span>

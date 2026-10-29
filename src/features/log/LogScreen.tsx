@@ -169,8 +169,8 @@ export function LogScreen() {
               {session.ended_at
                 ? formatDuration(session.started_at, session.ended_at)
                 : 'In progress'}{' '}
-              {setCount > 0 &&
-                ` · ${setCount} sets · ${Math.round(volume).toLocaleString('en-GB')} kg`}
+              {setCount > 0 && ` · ${setCount} sets`}
+              {volume > 0 && ` · ${Math.round(volume).toLocaleString('en-GB')} kg`}
               {cardio.minutes > 0 &&
                 ` · ${cardio.minutes} min cardio${cardio.calories ? ` (${cardio.calories} kcal)` : ''}`}
             </p>

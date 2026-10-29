@@ -24,9 +24,12 @@ export function previousPerformance(
   return { sessionId: latest.session_id, date: latest.completed_at, sets }
 }
 
-const toDraft = (s: Pick<LoggedSet, 'weight_kg' | 'reps' | 'set_type'>): DraftSet => ({
+const toDraft = (
+  s: Pick<LoggedSet, 'weight_kg' | 'reps' | 'duration_seconds' | 'set_type'>,
+): DraftSet => ({
   weight_kg: s.weight_kg,
   reps: s.reps,
+  duration_seconds: s.duration_seconds,
   set_type: s.set_type,
 })
 
@@ -53,5 +56,5 @@ export function nextDraft(
   if (last) return toDraft(last)
   const first = previous?.sets.find((s) => s.set_type !== 'warmup') ?? previous?.sets[0]
   if (first) return toDraft(first)
-  return { weight_kg: 0, reps: 0, set_type: 'working' }
+  return { weight_kg: 0, reps: 0, duration_seconds: null, set_type: 'working' }
 }

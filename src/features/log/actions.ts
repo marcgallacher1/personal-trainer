@@ -3,7 +3,7 @@ import { db } from '../../db/local'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, restoration, save, saveOne, type Change } from '../../db/write'
 import { detectPRs, type PR } from '../../lib/logging/pr'
-import type { DraftSet } from '../../lib/logging/types'
+import type { DraftSet, LogType } from '../../lib/logging/types'
 
 const live = <T extends { deleted_at: string | null }>(r: T) => r.deleted_at === null
 
@@ -115,12 +115,13 @@ export async function logSet(
   se: SessionExercise,
   draft: DraftSet,
   rir: number | null,
+  logType: LogType = 'weight_reps',
 ): Promise<{ id: string; prs: PR[] }> {
   const [history, today] = await Promise.all([
     db.sets.where('exercise_id').equals(se.exercise_id).toArray(),
     db.sets.where('session_id').equals(se.session_id).toArray(),
   ])
-  const prs = detectPRs(draft, history.filter(live) as Parameters<typeof detectPRs>[1])
+  const prs = detectPRs(draft, history.filter(live) as Parameters<typeof detectPRs>[1], logType)
   const mine = today.filter((s) => live(s) && s.session_exercise_id === se.id)
   const now = nowIso()
   const row: SetRow = {
@@ -133,6 +134,7 @@ export async function logSet(
     order: Math.max(-1, ...mine.map((s) => s.order)) + 1,
     weight_kg: draft.weight_kg,
     reps: draft.reps,
+    duration_seconds: draft.duration_seconds,
     rpe: null,
     rir,
     set_type: draft.set_type,
