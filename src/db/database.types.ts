@@ -220,6 +220,7 @@ export type Database = {
           max_sets: number
           min_sets: number
           muscle_id: string
+          paused: boolean
           priority: boolean
           updated_at: string
           user_id: string
@@ -230,6 +231,7 @@ export type Database = {
           max_sets?: number
           min_sets?: number
           muscle_id: string
+          paused?: boolean
           priority?: boolean
           updated_at?: string
           user_id?: string
@@ -240,6 +242,7 @@ export type Database = {
           max_sets?: number
           min_sets?: number
           muscle_id?: string
+          paused?: boolean
           priority?: boolean
           updated_at?: string
           user_id?: string
@@ -672,6 +675,8 @@ export type Database = {
           plan_exercise_id: string
           reps_max: number | null
           reps_min: number | null
+          seconds_max: number | null
+          seconds_min: number | null
           set_type: string
           target_rir: number | null
           target_rpe: number | null
@@ -688,6 +693,8 @@ export type Database = {
           plan_exercise_id: string
           reps_max?: number | null
           reps_min?: number | null
+          seconds_max?: number | null
+          seconds_min?: number | null
           set_type?: string
           target_rir?: number | null
           target_rpe?: number | null
@@ -704,6 +711,8 @@ export type Database = {
           plan_exercise_id?: string
           reps_max?: number | null
           reps_min?: number | null
+          seconds_max?: number | null
+          seconds_min?: number | null
           set_type?: string
           target_rir?: number | null
           target_rpe?: number | null
@@ -824,6 +833,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          body_goal: string | null
           bodyweight_kg: number | null
           created_at: string
           deleted_at: string | null
@@ -836,6 +846,7 @@ export type Database = {
           protein_g_per_kg: number
           quiet_end: string | null
           quiet_start: string | null
+          sessions_per_week: number
           settings: Json
           timezone: string
           units: string
@@ -843,6 +854,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          body_goal?: string | null
           bodyweight_kg?: number | null
           created_at?: string
           deleted_at?: string | null
@@ -855,6 +867,7 @@ export type Database = {
           protein_g_per_kg?: number
           quiet_end?: string | null
           quiet_start?: string | null
+          sessions_per_week?: number
           settings?: Json
           timezone?: string
           units?: string
@@ -862,6 +875,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          body_goal?: string | null
           bodyweight_kg?: number | null
           created_at?: string
           deleted_at?: string | null
@@ -874,6 +888,7 @@ export type Database = {
           protein_g_per_kg?: number
           quiet_end?: string | null
           quiet_start?: string | null
+          sessions_per_week?: number
           settings?: Json
           timezone?: string
           units?: string

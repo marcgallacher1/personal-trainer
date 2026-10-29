@@ -15,7 +15,11 @@ import {
   type Session,
   type SetRow,
 } from '../../db/queries'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../../db/local'
+import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
+import { addWorkoutExerciseToPlan } from '../plans/data'
 import {
   addExercise,
   deleteSession,
@@ -46,6 +50,21 @@ export function SessionScreen() {
   const [reordering, setReordering] = useState(false)
   /** 'new' = adding cardio; an entry = editing it */
   const [cardioOpen, setCardioOpen] = useState<CardioEntry | 'new' | null>(null)
+  const plannedTargets = useLiveQuery(async () => {
+    const ids = (exercises ?? []).map((e) => e.plan_exercise_id).filter((x): x is string => !!x)
+    return ids.length
+      ? (await db.plan_set_targets.where('plan_exercise_id').anyOf(ids).toArray()).filter(
+          (t) => !t.deleted_at,
+        )
+      : []
+  }, [exercises])
+  const plannedFor = (peId: string | null, lt: LogType) => {
+    if (!peId || !plannedTargets) return null
+    const ts = plannedTargets
+      .filter((t) => t.plan_exercise_id === peId)
+      .toSorted((a, b) => a.order - b.order)
+    return ts.length ? describeTargets(ts, lt) : null
+  }
 
   // ?open=<session_exercise_id> opens that exercise's logger (used after creating a custom exercise)
   const openId = params.get('open')
@@ -75,8 +94,26 @@ export function SessionScreen() {
 
   async function pick(e: Exercise) {
     setPicking(false)
-    const seId = await addExercise(session!.id, e)
+    const s = session!
+    const seId = await addExercise(s.id, e)
     setOpenId(seId)
+    // Workout from a plan: offer to keep this exercise in the plan for next time
+    if (s.plan_session_id) {
+      const planSessionId = s.plan_session_id
+      showToast({
+        message: `Added ${e.name} for today`,
+        action: {
+          label: 'Add to plan',
+          onClick: () =>
+            void db.session_exercises.get(seId).then((se) => {
+              if (!se) return
+              void addWorkoutExerciseToPlan(se, planSessionId, e, asLogType(e.log_type)).then(() =>
+                showToast({ message: `${e.name} added to the plan` }),
+              )
+            }),
+        },
+      })
+    }
   }
 
   async function remove(s: Session) {
@@ -146,6 +183,10 @@ export function SessionScreen() {
                     name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
                     logType={asLogType(byId.get(se.exercise_id)?.log_type)}
                     sets={allSets.filter((s) => s.session_exercise_id === se.id)}
+                    planned={plannedFor(
+                      se.plan_exercise_id,
+                      asLogType(byId.get(se.exercise_id)?.log_type),
+                    )}
                     notes={se.notes}
                     onOpen={() => {
                       if (!reordering) setOpenId(se.id)
@@ -316,12 +357,15 @@ function SummaryCard({
   name,
   logType,
   sets,
+  planned,
   notes,
   onOpen,
 }: {
   name: string
   logType: LogType
   sets: SetRow[]
+  /** Plan target summary, e.g. "3 × 8–12 reps · RIR 1" */
+  planned: string | null
   notes: string | null
   onOpen: () => void
 }) {
@@ -340,7 +384,9 @@ function SummaryCard({
         </span>
         <span className="block truncate text-sm text-muted">
           {working.length === 0
-            ? 'No sets yet · tap to log'
+            ? planned
+              ? `Planned: ${planned}`
+              : 'No sets yet · tap to log'
             : `${working.length} set${working.length === 1 ? '' : 's'} · ${working
                 .map((s) => formatSet(s, logType))
                 .join(' · ')}`}

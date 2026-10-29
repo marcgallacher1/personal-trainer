@@ -61,3 +61,21 @@ muscle weights as the database (1.0 for a primary mover, 0.5 for a secondary).
 navigations (offline), and handles `push` and `notificationclick`. When the app is already open, a
 notification tap sends the app a `navigate` message so in-memory state survives. Otherwise it opens a
 new window at the deep link.
+
+## Plans
+
+A plan contains sessions, which contain planned exercises, which contain per-set targets. All of
+these are ordinary synced rows. Rotation order is the order of the sessions; weekday mode uses
+`plan_schedule` rows. Templates in `src/lib/plans/templates.ts` are copied into normal rows by the
+pure `instantiateTemplate`.
+
+**Versions:** when you leave a plan screen, the plan's live rows are snapshotted into
+`plan_versions`, but only if they differ from the latest version. The comparison ignores key order
+and `created_at`, because Postgres `jsonb` and server timestamps format differently from the
+device. Restoring a version first saves the current state as a new version, then upserts the
+snapshot's rows and soft-deletes anything added since.
+
+**Workouts from plans:** `startFromPlan` copies a session's exercises into the workout, linked by
+`plan_exercise_id`. Each logged set records its `plan_set_target_id`. Targets are shown as hints
+only; weights never carry over between workouts. Mid-workout edits (add, swap, remove) ask whether
+to apply them today only or also to the plan.

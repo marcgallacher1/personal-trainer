@@ -45,6 +45,8 @@ interface Props {
   logType: LogType
   initial: EditorValue
   heading: string
+  /** Plan target for this set, shown under the heading */
+  target?: string
   submitLabel: string
   onSubmit: (v: EditorValue) => void
   /** Optional second action shown left of the primary one, e.g. "Log & close" */
@@ -59,6 +61,7 @@ export function SetEditor({
   logType,
   initial,
   heading,
+  target,
   submitLabel,
   onSubmit,
   secondaryLabel,
@@ -95,7 +98,10 @@ export function SetEditor({
   return (
     <div className="flex flex-col gap-4 rounded-3xl bg-surface p-4">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-lg font-bold">{heading}</h3>
+        <div>
+          <h3 className="text-lg font-bold">{heading}</h3>
+          {target && <p className="text-sm font-semibold text-accent">Target: {target}</p>}
+        </div>
         {onCancel && (
           <button type="button" className="h-9 text-sm text-muted" onClick={onCancel}>
             Cancel

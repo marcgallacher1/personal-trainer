@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { ComingSoon } from '../../components/ComingSoon'
@@ -21,7 +22,21 @@ export function MoreScreen() {
     <>
       <PageTitle>More</PageTitle>
       <div className="flex flex-col gap-4">
-        <ComingSoon phase="Phases 4–8">Reports, Data and Settings live here.</ComingSoon>
+        <Link
+          to="/goals"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <span className="text-2xl">🎯</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-bold">Goals</span>
+            <span className="block text-sm text-muted">
+              Bulk or cut, training focus, workouts per week, muscle focus
+            </span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+
+        <ComingSoon phase="Phases 4–8">Reports, Data and Settings will live here.</ComingSoon>
 
         <section className="rounded-2xl bg-surface p-4">
           <p className="text-sm text-muted">Signed in as</p>

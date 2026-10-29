@@ -1,9 +1,14 @@
 import { useRef, useState } from 'react'
+import { ChoiceDialog } from '../../components/ChoiceDialog'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
+import { describeTarget } from '../../lib/plans/targets'
+import { ExerciseList } from '../exercises/ExerciseList'
+import { removeFromPlan, swapExercise, usePlanExercise, usePlanTargets } from '../plans/data'
 import {
   asLogged,
   useExerciseHistory,
+  useExercises,
   type Exercise,
   type SessionExercise,
   type SetRow,
@@ -67,8 +72,26 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   // Timed sets have no RIR column
   const cols = timed ? 'grid-cols-[4.5rem_1fr_1fr]' : 'grid-cols-[4.5rem_1fr_1fr_3.5rem]'
 
+  // Plan targets (hint only — values still start blank / copy the last set)
+  const targets = usePlanTargets(se.plan_exercise_id) ?? []
+  const planExercise = usePlanExercise(se.plan_exercise_id)
+  const nextTarget = targets[sets.length]
+  const library = useExercises()
+  const [swapping, setSwapping] = useState(false)
+  const [swapTo, setSwapTo] = useState<Exercise | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const alternatives = (planExercise?.alternatives ?? [])
+    .map((id) => library?.find((e) => e.id === id))
+    .filter((e): e is Exercise => Boolean(e))
+  const nextInitial: EditorValue = {
+    ...draft,
+    // Follow the plan's set type (e.g. a planned warm-up) when there is one
+    set_type: (nextTarget?.set_type as SetType | undefined) ?? draft.set_type,
+    rir: null,
+  }
+
   async function submitNew(v: EditorValue, close: boolean) {
-    const { id, prs } = await logSet(se, v, v.rir, logType)
+    const { id, prs } = await logSet(se, v, v.rir, logType, nextTarget?.id ?? null)
     const label = v.set_type === 'warmup' ? 'Warm-up' : `Set ${nextNumber}`
     const text = `${label} logged · ${formatSet(v, logType)}`
     if (prs[0]) showToast({ message: describePR(prs[0]), tone: 'celebrate' })
@@ -82,13 +105,35 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
     }
   }
 
-  async function remove() {
+  async function remove(alsoFromPlan: boolean) {
+    setConfirmRemove(false)
     const changes = await removeSessionExercise(se)
+    if (alsoFromPlan && se.plan_exercise_id) {
+      await removeFromPlan(se.plan_exercise_id, exercise?.name ?? 'exercise')
+    }
     onClose()
     showToast({
-      message: `Removed ${exercise?.name ?? 'exercise'}`,
-      action: { label: 'Undo', onClick: () => void undoDeletion(changes) },
+      message: alsoFromPlan
+        ? `Removed ${exercise?.name ?? 'exercise'} from today and the plan`
+        : `Removed ${exercise?.name ?? 'exercise'}`,
+      action: alsoFromPlan
+        ? undefined
+        : { label: 'Undo', onClick: () => void undoDeletion(changes) },
     })
+  }
+
+  async function swap(to: Exercise, alsoInPlan: boolean) {
+    setSwapTo(null)
+    setSwapping(false)
+    await swapExercise(se, to, alsoInPlan)
+    showToast({
+      message: alsoInPlan ? `Swapped to ${to.name} in the plan too` : `Swapped to ${to.name}`,
+    })
+  }
+
+  function pickSwap(to: Exercise) {
+    if (se.plan_exercise_id) setSwapTo(to)
+    else void swap(to, false)
   }
 
   return (
@@ -229,11 +274,16 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
         ) : (
           <SetEditor
             // Re-initialise with the next prefilled values after each logged set
-            key={`next-${sets.length}-${previous?.sessionId ?? 'none'}`}
+            key={`next-${sets.length}-${nextTarget?.id ?? 'none'}`}
             logType={logType}
-            heading={draft.set_type === 'warmup' ? 'Next: warm-up set' : `Next: set ${nextNumber}`}
-            initial={{ ...draft, rir: null }}
-            submitLabel={draft.set_type === 'warmup' ? 'Log warm-up' : `Log set ${nextNumber}`}
+            heading={
+              nextInitial.set_type === 'warmup' ? 'Next: warm-up set' : `Next: set ${nextNumber}`
+            }
+            target={nextTarget ? describeTarget(nextTarget, logType) : undefined}
+            initial={nextInitial}
+            submitLabel={
+              nextInitial.set_type === 'warmup' ? 'Log warm-up' : `Log set ${nextNumber}`
+            }
             onSubmit={(v) => void submitNew(v, false)}
             secondaryLabel="Log & close"
             onSecondary={(v) => void submitNew(v, true)}
@@ -257,14 +307,92 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
           />
         </section>
 
-        <button
-          type="button"
-          onClick={() => void remove()}
-          className="h-12 rounded-xl bg-surface font-semibold text-danger"
-        >
-          Remove exercise from workout
-        </button>
+        <div className={`grid gap-2 ${sets.length === 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {sets.length === 0 && (
+            <button
+              type="button"
+              onClick={() => setSwapping(true)}
+              className="h-12 rounded-xl bg-surface font-semibold"
+            >
+              Swap exercise
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => (se.plan_exercise_id ? setConfirmRemove(true) : void remove(false))}
+            className="h-12 rounded-xl bg-surface font-semibold text-danger"
+          >
+            Remove
+          </button>
+        </div>
       </div>
+
+      <Sheet
+        open={swapping}
+        title="Swap exercise"
+        subtitle="Kit taken? Pick something else for today."
+        closeLabel="Cancel"
+        onClose={() => setSwapping(false)}
+      >
+        {alternatives.length > 0 && (
+          <section className="mb-4">
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+              Suggested swaps
+            </h3>
+            <div className="flex flex-col gap-2">
+              {alternatives.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => pickSwap(a)}
+                  className="h-14 rounded-xl bg-accent/15 px-4 text-left font-semibold"
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        <ExerciseList recentFirst onPick={pickSwap} />
+      </Sheet>
+
+      <ChoiceDialog
+        open={swapTo !== null}
+        title={`Swap to ${swapTo?.name}?`}
+        choices={[
+          {
+            label: 'Just for today',
+            description: 'The plan stays the same.',
+            tone: 'primary',
+            onSelect: () => swapTo && void swap(swapTo, false),
+          },
+          {
+            label: 'Today and in the plan',
+            description: `${exercise?.name ?? 'The old exercise'} becomes a swap option.`,
+            onSelect: () => swapTo && void swap(swapTo, true),
+          },
+        ]}
+        onCancel={() => setSwapTo(null)}
+      />
+
+      <ChoiceDialog
+        open={confirmRemove}
+        title={`Remove ${exercise?.name ?? 'exercise'}?`}
+        choices={[
+          {
+            label: 'Remove from today only',
+            description: 'It stays in your plan for next time.',
+            tone: 'primary',
+            onSelect: () => void remove(false),
+          },
+          {
+            label: 'Remove from today and the plan',
+            tone: 'danger',
+            onSelect: () => void remove(true),
+          },
+        ]}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </Sheet>
   )
 }

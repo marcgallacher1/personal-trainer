@@ -116,6 +116,7 @@ export async function logSet(
   draft: DraftSet,
   rir: number | null,
   logType: LogType = 'weight_reps',
+  planSetTargetId: string | null = null,
 ): Promise<{ id: string; prs: PR[] }> {
   const [history, today] = await Promise.all([
     db.sets.where('exercise_id').equals(se.exercise_id).toArray(),
@@ -130,7 +131,7 @@ export async function logSet(
     session_id: se.session_id,
     session_exercise_id: se.id,
     exercise_id: se.exercise_id,
-    plan_set_target_id: null,
+    plan_set_target_id: planSetTargetId,
     order: Math.max(-1, ...mine.map((s) => s.order)) + 1,
     weight_kg: draft.weight_kg,
     reps: draft.reps,

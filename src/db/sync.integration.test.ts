@@ -8,6 +8,15 @@ import {
   startSession,
 } from '../features/log/actions'
 import { saveCustomExercise } from '../features/exercises/actions'
+import {
+  createPlanFromTemplate,
+  loadPlanRows,
+  restoreVersion,
+  snapshotIfChanged,
+  startFromPlan,
+  updatePlanSession,
+} from '../features/plans/data'
+import { TEMPLATES } from '../lib/plans/templates'
 import { db } from './local'
 import { supabase } from './supabase'
 import { clearLocalData, pull, push } from './sync'
@@ -152,5 +161,45 @@ describe('offline log → push → wipe → pull', () => {
     await push()
     const { data } = await supabase.from('sessions').select('notes').eq('id', s.id).single()
     expect(data?.notes).toBe('local edit')
+  })
+})
+
+describe('plans round-trip', () => {
+  it('creates a plan from a template, starts a workout from it, versions and restores', async () => {
+    const tpl = TEMPLATES.find((t) => t.id === 'upper-focus-4')!
+    const planId = await createPlanFromTemplate(tpl)
+    const rows = (await loadPlanRows(planId))!
+    expect(rows.sessions.map((s) => s.name)).toEqual(['Push A', 'Pull A', 'Push B', 'Pull B'])
+    expect(rows.exercises).toHaveLength(27)
+    expect(rows.plan.is_active).toBe(true)
+
+    // Start Push A: exercises pre-loaded and linked to the plan
+    const workoutId = await startFromPlan(rows.sessions[0]!)
+    const items = await db.session_exercises.where('session_id').equals(workoutId).toArray()
+    expect(items).toHaveLength(7)
+    expect(items.every((i) => i.plan_exercise_id)).toBe(true)
+
+    // Edit: rename a session → a new version on save
+    await updatePlanSession(rows.sessions[0]!, { name: 'Push A (heavy)' })
+    expect(await snapshotIfChanged(planId, 'Edited')).toBe(true)
+    const versions = (await db.plan_versions.where('plan_id').equals(planId).toArray()).toSorted(
+      (a, b) => a.version - b.version,
+    )
+    expect(versions.map((v) => v.version)).toEqual([1, 2])
+
+    // Restore version 1 → name back, and a new version recorded
+    await restoreVersion(versions[0]!)
+    expect((await loadPlanRows(planId))!.sessions[0]!.name).toBe('Push A')
+
+    await push()
+    expect(await db.outbox.count()).toBe(0)
+
+    // New device: pull, and confirm the server copy doesn't look "changed"
+    await clearLocalData()
+    await pull()
+    const pulled = (await loadPlanRows(planId))!
+    expect(pulled.exercises).toHaveLength(27)
+    expect(pulled.sessions[0]!.name).toBe('Push A')
+    expect(await snapshotIfChanged(planId)).toBe(false)
   })
 })
