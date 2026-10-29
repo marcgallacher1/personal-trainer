@@ -42,9 +42,11 @@ iPhone (standalone PWA)
 
 ## Auth
 
-Sign-in uses a Supabase email OTP (a 6-digit code). Magic links aren't used: on iOS they open in
-Safari, which can't share its storage with the Home Screen app. The session is persisted in
-`localStorage` under `trainer-auth`.
+Sign-in uses Supabase email and password, with "Confirm email" turned off. Email links aren't usable:
+on iOS they open in Safari, which can't share its storage with the Home Screen app. Supabase's free
+tier also can't customise emails to send codes instead. The session is persisted in `localStorage`
+under `trainer-auth` and refreshes automatically, so you sign in once per device. Once your account
+exists, sign-ups are disabled on the hosted project, so it stays single-user.
 
 ## Reference data
 

@@ -233,14 +233,6 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-[auth.email.template.magic_link]
-subject = "Your Trainer sign-in code"
-content_path = "./supabase/templates/magic_link.html"
-
-[auth.email.template.confirmation]
-subject = "Your Trainer sign-in code"
-content_path = "./supabase/templates/confirmation.html"
-
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -409,3 +401,25 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# Hosted project overrides (applied by `supabase config push` when linked to this project).
+[remotes.production]
+project_id = "aypgvqsdllsmsehiyzgm"
+
+[remotes.production.auth]
+site_url = "https://personal-trainer-marcgallacher1s-projects.vercel.app/"
+additional_redirect_urls = [
+  "https://personal-trainer-marcgallacher1s-projects.vercel.app/",
+  "https://personal-trainer-marcgallacher1s-projects.vercel.app/**",
+  "https://personal-*-trainer-marcgallacher1s-projects.vercel.app",
+  "https://personal-*-trainer-marcgallacher1s-projects.vercel.app/**",
+]
+
+[remotes.production.auth.email]
+enable_confirmations = false
+otp_length = 8
+max_frequency = "1m0s"
+
+[remotes.production.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

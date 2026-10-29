@@ -31,7 +31,7 @@ cp .env.example .env.local
 npm run dev               # http://localhost:5173
 ```
 
-Sign-in emails are caught locally by Mailpit at <http://127.0.0.1:54324>.
+Locally, create an account from the sign-in screen (email confirmation is off).
 Supabase Studio is at <http://127.0.0.1:54323>.
 
 ### Useful scripts
@@ -62,18 +62,19 @@ fails if the generated migration is out of date.
    supabase link --project-ref <your-project-ref>
    supabase db push
    ```
-3. **Auth → Providers → Email:** keep Email enabled. "Confirm email" can stay on.
-4. **Auth → Email Templates:** in both **Magic Link** and **Confirm signup**, include the one-time code
-   `{{ .Token }}` (copy `supabase/templates/magic_link.html`). The app signs in with the 6-digit code,
-   not the link. On iOS a link would open in Safari, whose storage is separate from the installed app.
-5. **Auth → URL Configuration:** set the Site URL to your Vercel URL.
-6. **Project Settings → API:** copy the Project URL and the anon/publishable key for the next section.
+3. **Auth settings** are kept in `supabase/config.toml`. The `[remotes.production]` block holds the
+   hosted overrides (Site URL, redirect URLs, "Confirm email" off). Apply them with `supabase config push`.
+   This is the step that turns off "Confirm email" so password sign-up works without an email link.
+4. **Project Settings → API Keys:** copy the Project URL and the publishable key for the next section.
+5. After you've created your own account in the app, set `enable_signup = false` under
+   `[remotes.production.auth]` and run `supabase config push` again, so nobody else can register.
 
+> **Why password sign-in?** Email links on iOS open in Safari, which can't share its storage with the
+> Home Screen app. On the free tier, Supabase can't customise emails to send a code instead unless
+> you configure custom SMTP.
+>
 > Free-tier projects pause after 7 days with no API activity. Normal use of the app (and the
 > notification cron, from Phase 4) keeps the project active.
->
-> Supabase's built-in email sender is rate-limited to a few emails per hour. That's fine for one user
-> signing in occasionally. For more, add custom SMTP (for example, Resend's free tier).
 
 ## Deploying to Vercel
 
@@ -92,7 +93,8 @@ stale.
 1. Open the deployed URL in **Safari** (it must be Safari).
 2. Tap **Share**, then **Add to Home Screen**, then **Add**.
 3. Open **Trainer** from the Home Screen. It runs full screen, with no Safari bars.
-4. Enter your email, then type in the 6-digit code from the email.
+4. The first time, tap **Create an account** and choose a password. iCloud Keychain can save it. After
+   that you stay signed in.
 
 Push notifications (Phase 4) need iOS 16.4 or later and only work in the Home Screen app.
 
@@ -109,6 +111,6 @@ src/components  shared UI
 src/lib         PURE logic and Vitest tests (seed catalogue, platform detection, later analysis/progression…)
 src/db          Supabase client, Dexie schema, outbox and sync worker, generated DB types
 src/sw.ts       service worker (precache, offline SPA, push, notificationclick)
-supabase/       migrations, pgTAP tests, email templates, edge functions (later)
+supabase/       migrations, pgTAP tests, edge functions (later)
 scripts/        code generators
 ```
