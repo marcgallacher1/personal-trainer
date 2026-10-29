@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { Confirm } from '../../components/Confirm'
 import { Sheet } from '../../components/Sheet'
@@ -9,9 +9,10 @@ import {
   useSession,
   useSessionExercises,
   useSessionSets,
+  type Exercise,
   type Session,
+  type SetRow,
 } from '../../db/queries'
-import { RIR_EXPLAINER } from '../../lib/logging/settings'
 import { ExerciseList } from '../exercises/ExerciseList'
 import {
   addExercise,
@@ -21,18 +22,25 @@ import {
   undoDeletion,
   updateSession,
 } from './actions'
-import { ExerciseCard } from './ExerciseCard'
+import { ExerciseLogger, kg } from './ExerciseLogger'
 import { formatDuration, sessionTitle } from './format'
 
+/** Workout overview: one summary card per exercise; tap a card to log it in a full-screen modal. */
 export function SessionScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const session = useSession(id)
   const exercises = useSessionExercises(id)
   const sets = useSessionSets(id)
   const library = useExercises()
   const [picking, setPicking] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // ?open=<session_exercise_id> opens that exercise's logger (used after creating a custom exercise)
+  const openId = params.get('open')
+  const setOpenId = (seId: string | null) =>
+    setParams(seId ? { open: seId } : {}, { replace: true })
 
   if (session === undefined) return null
   if (session === null || session.deleted_at) {
@@ -48,8 +56,17 @@ export function SessionScreen() {
 
   const byId = new Map((library ?? []).map((e) => [e.id, e]))
   const list = exercises ?? []
+  const allSets = sets ?? []
   const active = session.ended_at === null
-  const workingSets = (sets ?? []).filter((s) => s.set_type !== 'warmup')
+  const workingSets = allSets.filter((s) => s.set_type !== 'warmup')
+  const openIndex = list.findIndex((se) => se.id === openId)
+  const open = openIndex >= 0 ? list[openIndex] : undefined
+
+  async function pick(e: Exercise) {
+    setPicking(false)
+    const seId = await addExercise(session!.id, e)
+    setOpenId(seId)
+  }
 
   async function remove(s: Session) {
     setConfirmDelete(false)
@@ -85,52 +102,65 @@ export function SessionScreen() {
             formatDuration(session.started_at, session.ended_at)
           )}
           {' · '}
-          {workingSets.length} sets
+          {list.length} exercise{list.length === 1 ? '' : 's'} · {workingSets.length} sets
         </p>
-        <p className="mt-2 text-xs text-muted">{RIR_EXPLAINER}</p>
       </div>
 
-      {list.map((se, i) => (
-        <ExerciseCard
-          key={se.id}
-          se={se}
-          exercise={byId.get(se.exercise_id)}
-          sets={(sets ?? []).filter((s) => s.session_exercise_id === se.id)}
-          canMoveUp={i > 0}
-          canMoveDown={i < list.length - 1}
-          onMove={(dir) => void moveSessionExercise(list, i, dir)}
-        />
-      ))}
+      {list.length === 0 && (
+        <p className="rounded-2xl bg-surface p-6 text-center text-muted">
+          Add your first exercise to get started.
+        </p>
+      )}
+
+      <ul className="flex flex-col gap-2">
+        {list.map((se) => (
+          <li key={se.id}>
+            <SummaryCard
+              name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
+              sets={allSets.filter((s) => s.session_exercise_id === se.id)}
+              notes={se.notes}
+              onOpen={() => setOpenId(se.id)}
+            />
+          </li>
+        ))}
+      </ul>
 
       <Button variant="secondary" onClick={() => setPicking(true)}>
         + Add exercise
       </Button>
 
-      <textarea
-        defaultValue={session.notes ?? ''}
-        key={`notes-${session.id}`}
-        placeholder="Workout notes"
-        rows={2}
-        className="w-full resize-none rounded-2xl bg-surface p-4 outline-none"
-        onBlur={(e) => {
-          const notes = e.target.value.trim() || null
-          if (notes !== session.notes) void updateSession(session, { notes })
-        }}
-      />
+      <section>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
+          Workout notes
+        </h2>
+        <textarea
+          defaultValue={session.notes ?? ''}
+          key={`notes-${session.id}`}
+          placeholder="How did it feel? Anything to remember next time?"
+          rows={2}
+          className="w-full resize-none rounded-2xl bg-surface p-4 outline-none"
+          onBlur={(e) => {
+            const notes = e.target.value.trim() || null
+            if (notes !== session.notes) void updateSession(session, { notes })
+          }}
+        />
+      </section>
 
       {active ? (
         <Button
+          className="h-16 text-xl"
+          disabled={list.length === 0}
           onClick={async () => {
             await finishSession(session)
             showToast({ message: `Workout saved · ${workingSets.length} sets` })
             void navigate('/log')
           }}
         >
-          Finish workout
+          Save workout
         </Button>
       ) : (
         <p className="text-center text-sm text-muted">
-          Finished{' '}
+          Saved{' '}
           {new Date(session.ended_at!).toLocaleString('en-GB', {
             dateStyle: 'medium',
             timeStyle: 'short',
@@ -142,14 +172,17 @@ export function SessionScreen() {
         Delete workout
       </button>
 
-      <Sheet open={picking} title="Add exercise" onClose={() => setPicking(false)}>
+      <Sheet
+        open={picking}
+        title="Add exercise"
+        subtitle="Search or filter by muscle, then tap an exercise."
+        closeLabel="Cancel"
+        onClose={() => setPicking(false)}
+      >
         <ExerciseList
           recentFirst
           added={new Set(list.map((se) => se.exercise_id))}
-          onPick={(e) => {
-            void addExercise(session.id, e)
-            setPicking(false)
-          }}
+          onPick={(e) => void pick(e)}
         />
         <Link
           to={`/exercises/new?addTo=${session.id}`}
@@ -158,6 +191,19 @@ export function SessionScreen() {
           + Create custom exercise
         </Link>
       </Sheet>
+
+      {open && (
+        <ExerciseLogger
+          key={open.id}
+          se={open}
+          exercise={byId.get(open.exercise_id)}
+          sets={allSets.filter((s) => s.session_exercise_id === open.id)}
+          canMoveUp={openIndex > 0}
+          canMoveDown={openIndex < list.length - 1}
+          onMove={(dir) => void moveSessionExercise(list, openIndex, dir)}
+          onClose={() => setOpenId(null)}
+        />
+      )}
 
       <Confirm
         open={confirmDelete}
@@ -168,6 +214,44 @@ export function SessionScreen() {
         onConfirm={() => void remove(session)}
       />
     </div>
+  )
+}
+
+function SummaryCard({
+  name,
+  sets,
+  notes,
+  onOpen,
+}: {
+  name: string
+  sets: SetRow[]
+  notes: string | null
+  onOpen: () => void
+}) {
+  const working = sets.filter((s) => s.set_type !== 'warmup')
+  const hasPR = sets.some((s) => s.is_pr)
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left active:opacity-80"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-lg font-bold">
+          {name}
+          {hasPR && <span className="ml-2">🏆</span>}
+        </span>
+        <span className="block truncate text-sm text-muted">
+          {working.length === 0
+            ? 'No sets yet · tap to log'
+            : `${working.length} set${working.length === 1 ? '' : 's'} · ${working
+                .map((s) => `${kg(s.weight_kg)}×${s.reps}`)
+                .join(' · ')}`}
+        </span>
+        {notes && <span className="mt-0.5 block truncate text-xs text-muted">✎ {notes}</span>}
+      </span>
+      <span className="text-2xl text-muted">›</span>
+    </button>
   )
 }
 

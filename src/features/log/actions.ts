@@ -54,7 +54,7 @@ export async function undoDeletion(changes: Change[]): Promise<void> {
   await save(changes.toReversed().map((c) => restoration(c.table, c.row)))
 }
 
-export async function addExercise(sessionId: string, exercise: Exercise): Promise<void> {
+export async function addExercise(sessionId: string, exercise: Exercise): Promise<string> {
   const existing = (
     await db.session_exercises.where('session_id').equals(sessionId).toArray()
   ).filter(live)
@@ -75,6 +75,7 @@ export async function addExercise(sessionId: string, exercise: Exercise): Promis
     deleted_at: null,
   }
   await saveOne('session_exercises', row)
+  return row.id
 }
 
 export async function updateSessionExercise(

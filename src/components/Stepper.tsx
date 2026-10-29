@@ -30,7 +30,7 @@ export function Stepper({ value, step, min = 0, unit, decimals = false, label, o
       <button
         type="button"
         aria-label={`Decrease ${label}`}
-        className="h-12 w-11 shrink-0 text-2xl text-muted active:text-text"
+        className="h-14 w-12 shrink-0 text-2xl text-muted active:text-text"
         onClick={() => onChange(Math.max(min, Math.round((value - step) * 100) / 100))}
       >
         −
@@ -43,12 +43,12 @@ export function Stepper({ value, step, min = 0, unit, decimals = false, label, o
           onChange={(e) => setEditing(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && commit()}
-          className="h-12 w-full min-w-0 bg-transparent text-center text-xl font-semibold tabular-nums outline-none"
+          className="h-14 w-full min-w-0 bg-transparent text-center text-2xl font-semibold tabular-nums outline-none"
         />
       ) : (
         <button
           type="button"
-          className="h-12 w-full min-w-0 text-center text-xl font-semibold tabular-nums"
+          className="h-14 w-full min-w-0 text-center text-2xl font-semibold tabular-nums"
           onClick={() => setEditing(fmt(value))}
         >
           {fmt(value)}
@@ -58,7 +58,7 @@ export function Stepper({ value, step, min = 0, unit, decimals = false, label, o
       <button
         type="button"
         aria-label={`Increase ${label}`}
-        className="h-12 w-11 shrink-0 text-2xl text-muted active:text-text"
+        className="h-14 w-12 shrink-0 text-2xl text-muted active:text-text"
         onClick={() => onChange(Math.round((value + step) * 100) / 100)}
       >
         +

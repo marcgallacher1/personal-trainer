@@ -59,8 +59,8 @@ function Form({ initial, existing }: { initial: ExerciseInput; existing?: Exerci
     setBusy(true)
     const exercise = await saveCustomExercise(v, existing)
     if (addTo) {
-      await addExercise(addTo, exercise)
-      void navigate(`/log/session/${addTo}`)
+      const seId = await addExercise(addTo, exercise)
+      void navigate(`/log/session/${addTo}?open=${seId}`, { replace: true })
     } else {
       void navigate(`/exercises/${exercise.id}`, { replace: true })
     }
