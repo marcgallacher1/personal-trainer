@@ -210,7 +210,7 @@ export function SessionScreen() {
       <button
         type="button"
         onClick={() => setCardioOpen('new')}
-        className="-mt-1 h-11 rounded-xl text-sm font-semibold text-muted active:bg-surface"
+        className="h-12 rounded-xl border border-border text-base font-semibold text-muted active:bg-surface"
       >
         + Add cardio
       </button>
