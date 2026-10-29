@@ -7,6 +7,8 @@ interface Props {
   /** Unit shown after the number, e.g. "kg" */
   unit?: string
   decimals?: boolean
+  /** Shown instead of 0 for optional values, e.g. "–" */
+  emptyLabel?: string
   label: string
   onChange: (v: number) => void
 }
@@ -14,12 +16,21 @@ interface Props {
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100))
 
 /** − value + with big tap targets. Tap the number to type a value. */
-export function Stepper({ value, step, min = 0, unit, decimals = false, label, onChange }: Props) {
+export function Stepper({
+  value,
+  step,
+  min = 0,
+  unit,
+  decimals = false,
+  emptyLabel,
+  label,
+  onChange,
+}: Props) {
   const [editing, setEditing] = useState<string | null>(null)
 
   const commit = () => {
     if (editing === null) return
-    const n = Number(editing.replace(',', '.'))
+    const n = editing.trim() === '' ? 0 : Number(editing.replace(',', '.'))
     if (Number.isFinite(n))
       onChange(Math.max(min, decimals ? Math.round(n * 100) / 100 : Math.round(n)))
     setEditing(null)
@@ -49,10 +60,16 @@ export function Stepper({ value, step, min = 0, unit, decimals = false, label, o
         <button
           type="button"
           className="h-14 w-full min-w-0 text-center text-2xl font-semibold tabular-nums"
-          onClick={() => setEditing(fmt(value))}
+          onClick={() => setEditing(value === 0 && emptyLabel ? '' : fmt(value))}
         >
-          {fmt(value)}
-          {unit && <span className="ml-0.5 text-xs font-normal text-muted">{unit}</span>}
+          {value === 0 && emptyLabel ? (
+            <span className="text-muted">{emptyLabel}</span>
+          ) : (
+            fmt(value)
+          )}
+          {unit && !(value === 0 && emptyLabel) && (
+            <span className="ml-0.5 text-xs font-normal text-muted">{unit}</span>
+          )}
         </button>
       )}
       <button

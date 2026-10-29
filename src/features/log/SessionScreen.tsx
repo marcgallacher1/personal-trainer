@@ -7,8 +7,10 @@ import { showToast } from '../../components/Toast'
 import {
   useExercises,
   useSession,
+  useSessionCardio,
   useSessionExercises,
   useSessionSets,
+  type CardioEntry,
   type Exercise,
   type Session,
   type SetRow,
@@ -22,6 +24,8 @@ import {
   undoDeletion,
   updateSession,
 } from './actions'
+import { cardioEmoji, cardioName, cardioSummary } from '../../lib/cardio'
+import { CardioLogger } from './CardioLogger'
 import { ExerciseLogger, kg } from './ExerciseLogger'
 import { formatDuration, sessionTitle } from './format'
 
@@ -33,9 +37,13 @@ export function SessionScreen() {
   const session = useSession(id)
   const exercises = useSessionExercises(id)
   const sets = useSessionSets(id)
+  const cardio = useSessionCardio(id)
   const library = useExercises()
   const [picking, setPicking] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [reordering, setReordering] = useState(false)
+  /** 'new' = adding cardio; an entry = editing it */
+  const [cardioOpen, setCardioOpen] = useState<CardioEntry | 'new' | null>(null)
 
   // ?open=<session_exercise_id> opens that exercise's logger (used after creating a custom exercise)
   const openId = params.get('open')
@@ -57,6 +65,7 @@ export function SessionScreen() {
   const byId = new Map((library ?? []).map((e) => [e.id, e]))
   const list = exercises ?? []
   const allSets = sets ?? []
+  const cardioList = cardio ?? []
   const active = session.ended_at === null
   const workingSets = allSets.filter((s) => s.set_type !== 'warmup')
   const openIndex = list.findIndex((se) => se.id === openId)
@@ -103,31 +112,108 @@ export function SessionScreen() {
           )}
           {' · '}
           {list.length} exercise{list.length === 1 ? '' : 's'} · {workingSets.length} sets
+          {cardioList.length > 0 && ` · ${cardioList.length} cardio`}
         </p>
       </div>
 
-      {list.length === 0 && (
+      {list.length === 0 && cardioList.length === 0 && (
         <p className="rounded-2xl bg-surface p-6 text-center text-muted">
           Add your first exercise to get started.
         </p>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {list.map((se) => (
-          <li key={se.id}>
-            <SummaryCard
-              name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
-              sets={allSets.filter((s) => s.session_exercise_id === se.id)}
-              notes={se.notes}
-              onOpen={() => setOpenId(se.id)}
-            />
-          </li>
-        ))}
-      </ul>
+      {list.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">Exercises</h2>
+            {list.length > 1 && (
+              <button
+                type="button"
+                className="h-8 rounded-full px-3 text-sm font-semibold text-accent"
+                onClick={() => setReordering((r) => !r)}
+              >
+                {reordering ? 'Done' : 'Reorder'}
+              </button>
+            )}
+          </div>
+          <ul className="flex flex-col gap-2">
+            {list.map((se, i) => (
+              <li key={se.id} className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SummaryCard
+                    name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
+                    sets={allSets.filter((s) => s.session_exercise_id === se.id)}
+                    notes={se.notes}
+                    onOpen={() => {
+                      if (!reordering) setOpenId(se.id)
+                    }}
+                  />
+                </div>
+                {reordering && (
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <button
+                      type="button"
+                      aria-label="Move up"
+                      disabled={i === 0}
+                      onClick={() => void moveSessionExercise(list, i, -1)}
+                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Move down"
+                      disabled={i === list.length - 1}
+                      onClick={() => void moveSessionExercise(list, i, 1)}
+                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <Button variant="secondary" onClick={() => setPicking(true)}>
         + Add exercise
       </Button>
+
+      {cardioList.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Cardio</h2>
+          <ul className="flex flex-col gap-2">
+            {cardioList.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => setCardioOpen(c)}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left active:opacity-80"
+                >
+                  <span className="text-2xl">{cardioEmoji(c.activity)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-lg font-bold">
+                      {cardioName(c.activity)}
+                    </span>
+                    <span className="block truncate text-sm text-muted">{cardioSummary(c)}</span>
+                  </span>
+                  <span className="text-2xl text-muted">›</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setCardioOpen('new')}
+        className="-mt-1 h-11 rounded-xl text-sm font-semibold text-muted active:bg-surface"
+      >
+        + Add cardio
+      </button>
 
       <section>
         <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
@@ -149,7 +235,7 @@ export function SessionScreen() {
       {active ? (
         <Button
           className="h-16 text-xl"
-          disabled={list.length === 0}
+          disabled={list.length === 0 && cardioList.length === 0}
           onClick={async () => {
             await finishSession(session)
             showToast({ message: `Workout saved · ${workingSets.length} sets` })
@@ -198,10 +284,16 @@ export function SessionScreen() {
           se={open}
           exercise={byId.get(open.exercise_id)}
           sets={allSets.filter((s) => s.session_exercise_id === open.id)}
-          canMoveUp={openIndex > 0}
-          canMoveDown={openIndex < list.length - 1}
-          onMove={(dir) => void moveSessionExercise(list, openIndex, dir)}
           onClose={() => setOpenId(null)}
+        />
+      )}
+
+      {cardioOpen && (
+        <CardioLogger
+          key={cardioOpen === 'new' ? 'new' : cardioOpen.id}
+          sessionId={session.id}
+          existing={cardioOpen === 'new' ? undefined : cardioOpen}
+          onClose={() => setCardioOpen(null)}
         />
       )}
 

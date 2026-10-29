@@ -64,6 +64,65 @@ export type Database = {
         }
         Relationships: []
       }
+      cardio_entries: {
+        Row: {
+          activity: string
+          avg_hr: number | null
+          calories: number | null
+          completed_at: string
+          created_at: string
+          deleted_at: string | null
+          distance_km: number | null
+          duration_seconds: number
+          id: string
+          notes: string | null
+          order: number
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity: string
+          avg_hr?: number | null
+          calories?: number | null
+          completed_at?: string
+          created_at?: string
+          deleted_at?: string | null
+          distance_km?: number | null
+          duration_seconds: number
+          id?: string
+          notes?: string | null
+          order?: number
+          session_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          activity?: string
+          avg_hr?: number | null
+          calories?: number | null
+          completed_at?: string
+          created_at?: string
+          deleted_at?: string | null
+          distance_km?: number | null
+          duration_seconds?: number
+          id?: string
+          notes?: string | null
+          order?: number
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cardio_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_muscles: {
         Row: {
           deleted_at: string | null

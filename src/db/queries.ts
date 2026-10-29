@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { cardioTotals } from '../lib/cardio'
 import type { LoggedSet } from '../lib/logging/types'
 import type { Tables } from './database.types'
 import { db } from './local'
@@ -6,6 +7,7 @@ import { db } from './local'
 export type Session = Tables<'sessions'>
 export type SessionExercise = Tables<'session_exercises'>
 export type SetRow = Tables<'sets'>
+export type CardioEntry = Tables<'cardio_entries'>
 export type Exercise = Tables<'exercises'>
 export type Muscle = Tables<'muscles'>
 export type ExerciseMuscle = Tables<'exercise_muscles'>
@@ -42,6 +44,18 @@ export function useSessionSets(sessionId: string | undefined): SetRow[] | undefi
     async () =>
       sessionId
         ? (await db.sets.where('session_id').equals(sessionId).toArray())
+            .filter(live)
+            .toSorted((a, b) => a.order - b.order)
+        : [],
+    [sessionId],
+  )
+}
+
+export function useSessionCardio(sessionId: string | undefined): CardioEntry[] | undefined {
+  return useLiveQuery(
+    async () =>
+      sessionId
+        ? (await db.cardio_entries.where('session_id').equals(sessionId).toArray())
             .filter(live)
             .toSorted((a, b) => a.order - b.order)
         : [],
@@ -105,23 +119,38 @@ export interface SessionSummary {
   setCount: number
   volume: number
   exerciseIds: string[]
+  cardio: { minutes: number; calories: number; activities: string[] }
+}
+
+function groupBySession<T extends { session_id: string; deleted_at: string | null }>(
+  rows: T[],
+): Map<string, T[]> {
+  const map = new Map<string, T[]>()
+  for (const r of rows) {
+    if (r.deleted_at) continue
+    const list = map.get(r.session_id) ?? []
+    list.push(r)
+    map.set(r.session_id, list)
+  }
+  return map
 }
 
 export function useSessionSummaries(): SessionSummary[] | undefined {
   return useLiveQuery(async () => {
-    const [sessions, sets] = await Promise.all([db.sessions.toArray(), db.sets.toArray()])
-    const bySession = new Map<string, SetRow[]>()
-    for (const s of sets) {
-      if (s.deleted_at) continue
-      const list = bySession.get(s.session_id) ?? []
-      list.push(s)
-      bySession.set(s.session_id, list)
-    }
+    const [sessions, sets, cardio] = await Promise.all([
+      db.sessions.toArray(),
+      db.sets.toArray(),
+      db.cardio_entries.toArray(),
+    ])
+    const setsBySession = groupBySession(sets)
+    const cardioBySession = groupBySession(cardio)
     return sessions
       .filter(live)
       .toSorted((a, b) => b.started_at.localeCompare(a.started_at))
       .map((session) => {
-        const ss = bySession.get(session.id) ?? []
+        const ss = setsBySession.get(session.id) ?? []
+        const cc = cardioBySession.get(session.id) ?? []
+        const totals = cardioTotals(cc)
         return {
           session,
           setCount: ss.filter((s) => s.set_type !== 'warmup').length,
@@ -129,6 +158,7 @@ export function useSessionSummaries(): SessionSummary[] | undefined {
             .filter((s) => s.set_type !== 'warmup')
             .reduce((v, s) => v + s.weight_kg * s.reps, 0),
           exerciseIds: [...new Set(ss.map((s) => s.exercise_id))],
+          cardio: { ...totals, activities: [...new Set(cc.map((c) => c.activity))] },
         }
       })
   }, [])

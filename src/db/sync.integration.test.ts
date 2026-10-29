@@ -4,6 +4,7 @@ import {
   deleteSet,
   finishSession,
   logSet,
+  saveCardio,
   startSession,
 } from '../features/log/actions'
 import { saveCustomExercise } from '../features/exercises/actions'
@@ -60,6 +61,16 @@ describe('offline log → push → wipe → pull', () => {
       muscles: { biceps: 'primary', forearms: 'secondary' },
     })
 
+    // Cardio in session 2 (optional fields left empty)
+    await saveCardio(s2, {
+      activity: 'row',
+      duration_seconds: 900,
+      calories: 180,
+      distance_km: null,
+      avg_hr: null,
+      notes: null,
+    })
+
     expect(await db.outbox.count()).toBeGreaterThan(0)
     await push()
     expect(await db.outbox.count()).toBe(0)
@@ -77,6 +88,13 @@ describe('offline log → push → wipe → pull', () => {
       ['biceps', 1],
       ['forearms', 0.5],
     ])
+    const { data: serverCardio } = await supabase
+      .from('cardio_entries')
+      .select('*')
+      .eq('session_id', s2)
+    expect(serverCardio?.map((c) => [c.activity, c.duration_seconds, c.calories])).toEqual([
+      ['row', 900, 180],
+    ])
 
     // New device: wipe and pull
     await clearLocalData()
@@ -88,6 +106,7 @@ describe('offline log → push → wipe → pull', () => {
     expect((await db.sessions.get(s1))?.ended_at).not.toBeNull()
     expect((await db.exercises.get(custom.id))?.is_custom).toBe(true)
     expect(await db.exercises.count()).toBeGreaterThanOrEqual(141)
+    expect(await db.cardio_entries.where('session_id').equals(s2).count()).toBe(1)
   })
 
   it('keeps un-pushed local edits when a pull brings older server data', async () => {

@@ -23,6 +23,7 @@ export const SYNCED_TABLES = [
   'sessions',
   'session_exercises',
   'sets',
+  'cardio_entries',
   'weekly_reports',
   'protein_logs',
   'bodyweight_logs',
@@ -66,6 +67,7 @@ export class TrainerDB extends Dexie {
   sessions!: EntityTable<Tables<'sessions'>, 'id'>
   session_exercises!: EntityTable<Tables<'session_exercises'>, 'id'>
   sets!: EntityTable<Tables<'sets'>, 'id'>
+  cardio_entries!: EntityTable<Tables<'cardio_entries'>, 'id'>
   weekly_reports!: EntityTable<Tables<'weekly_reports'>, 'id'>
   protein_logs!: EntityTable<Tables<'protein_logs'>, 'id'>
   bodyweight_logs!: EntityTable<Tables<'bodyweight_logs'>, 'id'>
@@ -99,6 +101,10 @@ export class TrainerDB extends Dexie {
       notification_rules: 'id, type',
       outbox: '++seq, table, key',
       meta: 'key',
+    })
+    // v2: cardio inside workouts
+    this.version(2).stores({
+      cardio_entries: 'id, session_id, completed_at',
     })
   }
 }

@@ -9,6 +9,7 @@ import {
   type SessionSummary,
 } from '../../db/queries'
 import { monthGrid, shiftMonth } from '../../lib/time/calendar'
+import { cardioName } from '../../lib/cardio'
 import { startSession } from './actions'
 import { formatDuration, londonDate, sessionTitle } from './format'
 
@@ -150,7 +151,7 @@ export function LogScreen() {
             {summaries?.length ? 'No workouts here.' : 'No workouts yet. Start one above!'}
           </p>
         )}
-        {visible.map(({ session, setCount, volume, exerciseIds }) => (
+        {visible.map(({ session, setCount, volume, exerciseIds, cardio }) => (
           <Link
             key={session.id}
             to={`/log/session/${session.id}`}
@@ -168,12 +169,14 @@ export function LogScreen() {
               {session.ended_at
                 ? formatDuration(session.started_at, session.ended_at)
                 : 'In progress'}{' '}
-              · {setCount} sets · {Math.round(volume).toLocaleString('en-GB')} kg
+              {setCount > 0 &&
+                ` · ${setCount} sets · ${Math.round(volume).toLocaleString('en-GB')} kg`}
+              {cardio.minutes > 0 &&
+                ` · ${cardio.minutes} min cardio${cardio.calories ? ` (${cardio.calories} kcal)` : ''}`}
             </p>
-            {exerciseIds.length > 0 && (
+            {(exerciseIds.length > 0 || cardio.activities.length > 0) && (
               <p className="mt-1 truncate text-sm">
-                {exerciseIds
-                  .map((id) => names.get(id))
+                {[...exerciseIds.map((id) => names.get(id)), ...cardio.activities.map(cardioName)]
                   .filter(Boolean)
                   .join(', ')}
               </p>

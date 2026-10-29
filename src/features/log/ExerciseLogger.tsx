@@ -35,22 +35,11 @@ interface Props {
   se: SessionExercise
   exercise: Exercise | undefined
   sets: SetRow[]
-  canMoveUp: boolean
-  canMoveDown: boolean
-  onMove: (dir: -1 | 1) => void
   onClose: () => void
 }
 
 /** Full-screen modal for logging one exercise. */
-export function ExerciseLogger({
-  se,
-  exercise,
-  sets,
-  canMoveUp,
-  canMoveDown,
-  onMove,
-  onClose,
-}: Props) {
+export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   const history = useExerciseHistory(se.exercise_id)
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
   /** The set just logged, so we can highlight it and confirm what happened. */
@@ -253,32 +242,13 @@ export function ExerciseLogger({
           />
         </section>
 
-        {/* Exercise actions */}
-        <section className="grid grid-cols-3 gap-2 text-sm">
-          <button
-            type="button"
-            disabled={!canMoveUp}
-            onClick={() => onMove(-1)}
-            className="h-12 rounded-xl bg-surface font-medium disabled:opacity-40"
-          >
-            ↑ Move up
-          </button>
-          <button
-            type="button"
-            disabled={!canMoveDown}
-            onClick={() => onMove(1)}
-            className="h-12 rounded-xl bg-surface font-medium disabled:opacity-40"
-          >
-            ↓ Move down
-          </button>
-          <button
-            type="button"
-            onClick={() => void remove()}
-            className="h-12 rounded-xl bg-surface font-medium text-danger"
-          >
-            Remove
-          </button>
-        </section>
+        <button
+          type="button"
+          onClick={() => void remove()}
+          className="h-12 rounded-xl bg-surface font-semibold text-danger"
+        >
+          Remove exercise from workout
+        </button>
       </div>
     </Sheet>
   )

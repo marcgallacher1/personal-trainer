@@ -1,4 +1,4 @@
-import type { Exercise, Session, SessionExercise, SetRow } from '../../db/queries'
+import type { CardioEntry, Exercise, Session, SessionExercise, SetRow } from '../../db/queries'
 import { db } from '../../db/local'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, restoration, save, saveOne, type Change } from '../../db/write'
@@ -35,13 +35,15 @@ export async function finishSession(session: Session): Promise<void> {
 }
 
 export async function deleteSession(session: Session): Promise<Change[]> {
-  const [exercises, sets] = await Promise.all([
+  const [exercises, sets, cardio] = await Promise.all([
     db.session_exercises.where('session_id').equals(session.id).toArray(),
     db.sets.where('session_id').equals(session.id).toArray(),
+    db.cardio_entries.where('session_id').equals(session.id).toArray(),
   ])
   const changes = [
     // Children first so a partial upload never leaves live children under a deleted parent.
     ...sets.filter(live).map((s) => deletion('sets', s)),
+    ...cardio.filter(live).map((c) => deletion('cardio_entries', c)),
     ...exercises.filter(live).map((e) => deletion('session_exercises', e)),
     deletion('sessions', session),
   ]
@@ -150,6 +152,49 @@ export async function updateSet(set: SetRow, patch: Partial<SetRow>): Promise<vo
 
 export async function deleteSet(set: SetRow): Promise<Change[]> {
   const changes = [deletion('sets', set)]
+  await save(changes)
+  return changes
+}
+
+export interface CardioInput {
+  activity: string
+  duration_seconds: number
+  calories: number | null
+  distance_km: number | null
+  avg_hr: number | null
+  notes: string | null
+}
+
+/** Creates a cardio entry, or updates `existing`. */
+export async function saveCardio(
+  sessionId: string,
+  input: CardioInput,
+  existing?: CardioEntry,
+): Promise<void> {
+  if (existing) {
+    await saveOne('cardio_entries', { ...existing, ...input })
+    return
+  }
+  const others = (await db.cardio_entries.where('session_id').equals(sessionId).toArray()).filter(
+    live,
+  )
+  const now = nowIso()
+  const row: CardioEntry = {
+    id: newId(),
+    user_id: requireUserId(),
+    session_id: sessionId,
+    ...input,
+    order: Math.max(-1, ...others.map((c) => c.order)) + 1,
+    completed_at: now,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  }
+  await saveOne('cardio_entries', row)
+}
+
+export async function deleteCardio(entry: CardioEntry): Promise<Change[]> {
+  const changes = [deletion('cardio_entries', entry)]
   await save(changes)
   return changes
 }
