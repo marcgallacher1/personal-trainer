@@ -20,6 +20,7 @@ import { PlanEditorScreen } from '../features/plans/PlanEditorScreen'
 import { PlanHistoryScreen } from '../features/plans/PlanHistoryScreen'
 import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
+import { RatingScreen } from '../features/plans/RatingScreen'
 import { ProgressScreen } from '../features/progress/ProgressScreen'
 import { TodayScreen } from '../features/today/TodayScreen'
 import { BootScreen } from './BootScreen'
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
       { path: '/plans/:planId/add', element: <PlanBuilderScreen /> },
       { path: '/plans/:planId/sessions/:sessionId', element: <PlanSessionScreen /> },
       { path: '/plans/:planId/history', element: <PlanHistoryScreen /> },
+      { path: '/plans/:planId/rating', element: <RatingScreen /> },
       { path: '/goals', element: <GoalsScreen /> },
       { path: '/more', element: <MoreScreen /> },
       { path: '*', element: <TodayScreen /> },

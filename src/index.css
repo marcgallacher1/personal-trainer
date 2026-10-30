@@ -12,6 +12,7 @@
   --color-accent-fg: #ffffff;
   --color-danger: #dc2626;
   --color-success: #16a34a;
+  --color-warn: #d97706;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,6 +27,7 @@
     --color-accent-fg: #04201c;
     --color-danger: #f87171;
     --color-success: #4ade80;
+    --color-warn: #fbbf24;
   }
 }
 

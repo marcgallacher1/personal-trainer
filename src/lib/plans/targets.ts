@@ -79,3 +79,17 @@ export function quickSets(input: QuickSetsInput, logType: LogType): TargetLike[]
     target_rir: input.rir,
   }))
 }
+
+/**
+ * The same targets with `n` working sets: extra sets copy the last working set, and removed ones
+ * come off the end. Warm-ups are kept.
+ */
+export function withWorkingSets<T extends TargetLike>(targets: readonly T[], n: number): T[] {
+  const work = targets.filter((t) => t.set_type !== 'warmup')
+  const last = work.at(-1)
+  if (!last) return [...targets]
+  let keep = n
+  const out = targets.filter((t) => t.set_type === 'warmup' || keep-- > 0)
+  for (let i = work.length; i < n; i++) out.push({ ...last })
+  return out
+}

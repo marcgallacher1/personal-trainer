@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { describeTarget, describeTargets, quickSets, type TargetLike } from './targets'
+import {
+  describeTarget,
+  describeTargets,
+  quickSets,
+  withWorkingSets,
+  type TargetLike,
+} from './targets'
 
 const t = (
   reps_min: number | null,
@@ -57,5 +63,34 @@ describe('quickSets', () => {
       seconds_min: 30,
       seconds_max: 45,
     })
+  })
+})
+
+describe('withWorkingSets', () => {
+  const warm: TargetLike = {
+    ...quickSets({ sets: 1, min: 10, max: 10, rir: null }, 'weight_reps')[0]!,
+    set_type: 'warmup',
+  }
+  const work = quickSets({ sets: 3, min: 8, max: 12, rir: 1 }, 'weight_reps')
+
+  it('adds sets by copying the last working set, keeping warm-ups', () => {
+    const out = withWorkingSets([warm, ...work], 5)
+    expect(out.map((x) => x.set_type)).toEqual([
+      'warmup',
+      'working',
+      'working',
+      'working',
+      'working',
+      'working',
+    ])
+    expect(out[5]).toEqual(work[2])
+  })
+
+  it('removes working sets from the end', () => {
+    expect(withWorkingSets([warm, ...work], 2).map((x) => x.set_type)).toEqual([
+      'warmup',
+      'working',
+      'working',
+    ])
   })
 })

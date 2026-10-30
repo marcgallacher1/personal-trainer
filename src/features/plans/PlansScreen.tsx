@@ -6,11 +6,19 @@ import { showToast } from '../../components/Toast'
 import { db } from '../../db/local'
 import { weekSummary } from '../../lib/plans/draft'
 import type { PlanRow } from '../../lib/plans/instantiate'
-import { setPlanActive, usePlans } from './data'
+import { setPlanActive, usePlanLibrary, usePlans } from './data'
+import { rateSavedPlan, useRatingContext } from './rating'
+import { ScoreBadge } from './ScoreBadge'
 
 export function PlansScreen() {
   const navigate = useNavigate()
   const plans = usePlans()
+  const library = usePlanLibrary()
+  const ratingCtx = useRatingContext()
+  const scoreOf = (planId: string) => {
+    const rows = library?.find((l) => l.plan.id === planId)
+    return rows && ratingCtx ? rateSavedPlan(rows, ratingCtx).score : null
+  }
   // Per plan: its workouts with their days, for the one-line week summary
   const weeks = useLiveQuery(async () => {
     const [sessions, schedule] = await Promise.all([
@@ -37,13 +45,26 @@ export function PlansScreen() {
       </Button>
 
       {(plans ?? []).map((p) => (
-        <PlanCard key={p.id} plan={p} summary={weekSummary(weeks?.get(p.id) ?? [])} />
+        <PlanCard
+          key={p.id}
+          plan={p}
+          summary={weekSummary(weeks?.get(p.id) ?? [])}
+          score={scoreOf(p.id)}
+        />
       ))}
     </div>
   )
 }
 
-function PlanCard({ plan, summary }: { plan: PlanRow; summary: string }) {
+function PlanCard({
+  plan,
+  summary,
+  score,
+}: {
+  plan: PlanRow
+  summary: string
+  score: number | null
+}) {
   const on = plan.is_active
   return (
     <div
@@ -57,6 +78,11 @@ function PlanCard({ plan, summary }: { plan: PlanRow; summary: string }) {
           {summary || 'No days set yet'}
         </p>
       </Link>
+      {score ? (
+        <Link to={`/plans/${plan.id}/rating`} aria-label="See plan rating">
+          <ScoreBadge score={score} />
+        </Link>
+      ) : null}
       <Slider
         on={on}
         label={`${plan.name} active`}

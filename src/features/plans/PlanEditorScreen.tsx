@@ -15,6 +15,8 @@ import {
   usePlanRows,
 } from './data'
 import { ActiveToggle } from './PlanBuilderScreen'
+import { rateSavedPlan, useRatingContext } from './rating'
+import { ScoreBadge } from './ScoreBadge'
 import { WeekdayPicker } from './WeekdayPicker'
 
 /** Saves a version when you leave a plan screen, if anything changed. */
@@ -32,6 +34,7 @@ export function PlanEditorScreen() {
   const { planId } = useParams()
   const navigate = useNavigate()
   const rows = usePlanRows(planId)
+  const ratingCtx = useRatingContext()
   const [menu, setMenu] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
@@ -59,6 +62,7 @@ export function PlanEditorScreen() {
   }))
   const week = weekOf(items)
   const toRemove = sessions.find((s) => s.id === removing)
+  const rating = ratingCtx ? rateSavedPlan(rows, ratingCtx) : null
 
   return (
     <div className="flex flex-col gap-5">
@@ -82,6 +86,22 @@ export function PlanEditorScreen() {
           )
         }
       />
+
+      {rating && rating.score > 0 && (
+        <Link
+          to={`/plans/${plan.id}/rating`}
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <ScoreBadge score={rating.score} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">Plan rating · {rating.verdict}</span>
+            <span className="block text-sm text-muted">
+              See what’s working and what could be even better
+            </span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+      )}
 
       <section>
         <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Your week</h2>
