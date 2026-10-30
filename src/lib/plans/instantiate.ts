@@ -1,5 +1,6 @@
 import type { Tables } from '../../db/database.types'
 import type { TemplateSession } from './templates'
+import type { TargetLike } from './targets'
 
 export type PlanRow = Tables<'plans'>
 export type PlanSessionRow = Tables<'plan_sessions'>
@@ -144,8 +145,8 @@ export interface WorkoutRows {
 }
 
 /**
- * Copies one preset workout (or an empty custom one) into a plan as a fully editable workout.
- * Unknown exercise names are skipped and reported back.
+ * Copies one preset workout (or the user's own, with any exercises they picked) into a plan as a
+ * fully editable workout. Unknown preset exercise names are skipped and reported back.
  */
 export function instantiateWorkout(
   preset: TemplateSession | null,
@@ -154,11 +155,20 @@ export function instantiateWorkout(
   order: number,
   exerciseIdByName: ReadonlyMap<string, string>,
   ctx: Ctx,
+  custom: readonly { exerciseId: string; targets: readonly TargetLike[] }[] = [],
+  emoji: string | null = null,
 ): WorkoutRows {
-  const session = newSessionRow(ctx, planId, title, order, preset?.emoji ?? null)
+  const session = newSessionRow(ctx, planId, title, order, preset?.emoji ?? emoji)
   session.notes = preset?.description ?? null
   const out: WorkoutRows = { session, exercises: [], targets: [], missing: [] }
-  if (!preset) return out
+  if (!preset) {
+    custom.forEach((ce, n) => {
+      const pe = newPlanExerciseRow(ctx, session.id, ce.exerciseId, n)
+      out.exercises.push(pe)
+      ce.targets.forEach((t, i) => out.targets.push(newTargetRow(ctx, pe.id, i, t)))
+    })
+    return out
+  }
 
   const groupIds = new Map<string, string>()
   const groupSizes = new Map<string, number>()

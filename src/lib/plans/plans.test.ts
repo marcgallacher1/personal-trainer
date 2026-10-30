@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { EXERCISES } from '../seed/exercises'
 import {
   buildPlanFromDraft,
+  replaceDraftSource,
   sourceKey,
   titleFor,
   toggleDraftDay,
@@ -121,6 +122,49 @@ describe('draft plan', () => {
     // Custom workouts start empty, ready to fill in
     expect(rows.exercises.filter((e) => e.plan_session_id === rows.sessions[2]!.id)).toEqual([])
     expect(rows.missing).toEqual([])
+  })
+})
+
+describe('custom workouts with chosen exercises', () => {
+  const set = {
+    set_type: 'working',
+    reps_min: 8,
+    reps_max: 12,
+    seconds_min: null,
+    seconds_max: null,
+    target_rir: 1,
+  }
+  const myPush: WorkoutSource = {
+    kind: 'custom',
+    name: 'Custom Push',
+    templateId: 'push',
+    exercises: [
+      { exerciseId: 'ex-incline', targets: [set, set, set] },
+      { exerciseId: 'ex-dips', targets: [set, set] },
+    ],
+  }
+
+  it('copies the chosen exercises and their targets into the plan, in order', () => {
+    const draft = toggleDraftDay([], myPush, 3).draft
+    expect(draft[0]!.emoji).toBe(TEMPLATES.find((t) => t.id === 'push')!.sessions[0]!.emoji)
+    const rows = buildPlanFromDraft('Mine', draft, names, ctx())
+    expect(rows.sessions.map((s) => s.name)).toEqual(['Custom Push'])
+    expect(rows.exercises.map((e) => [e.exercise_id, e.order])).toEqual([
+      ['ex-incline', 0],
+      ['ex-dips', 1],
+    ])
+    expect(rows.targets).toHaveLength(5)
+    expect(rows.schedule.map((d) => d.weekday)).toEqual([3])
+  })
+
+  it('updates a workout already on a day when its exercises or name change', () => {
+    const draft = toggleDraftDay([], myPush, 3).draft
+    const renamed: WorkoutSource = { ...myPush, name: 'Big Push', exercises: [] }
+    const next = replaceDraftSource(draft, sourceKey(myPush), renamed)
+    expect(next).toEqual([
+      expect.objectContaining({ key: 'custom:big push', title: 'Big Push', weekdays: [3] }),
+    ])
+    expect(replaceDraftSource(draft, 'custom:nope', renamed)).toEqual(draft)
   })
 })
 

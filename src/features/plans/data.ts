@@ -7,6 +7,8 @@ import { deletion, newId, nowIso, save, saveOne, type Change } from '../../db/wr
 import { isTimed, type LogType } from '../../lib/logging/types'
 import {
   buildPlanFromDraft,
+  customExercisesOf,
+  emojiFor,
   presetFor,
   titleFor,
   type DraftItem,
@@ -248,6 +250,8 @@ export async function togglePlanDay(
     order,
     await exerciseIdsByName(),
     c,
+    customExercisesOf(source),
+    emojiFor(source),
   )
   await save([
     { table: 'plan_sessions', row: w.session },

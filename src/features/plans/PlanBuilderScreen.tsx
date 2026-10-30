@@ -4,8 +4,11 @@ import { BackButton } from '../../components/BackButton'
 import { Confirm } from '../../components/Confirm'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
+import type { Exercise } from '../../db/queries'
+import { asLogType } from '../../lib/logging/logTypes'
 import {
   DAY_NAMES,
+  replaceDraftSource,
   sourceKey,
   titleFor,
   toggleDraftDay,
@@ -14,7 +17,16 @@ import {
   type WorkoutSource,
 } from '../../lib/plans/draft'
 import { TEMPLATES, versionTitle, type PlanTemplate } from '../../lib/plans/templates'
-import { savePlanFromDraft, togglePlanDay, usePlanRows, usePlans } from './data'
+import { CustomWorkoutCard, type CustomCard } from './CustomWorkoutCard'
+import { DayButtons } from './DayButtons'
+import {
+  addPlanExercise,
+  removePlanExercise,
+  savePlanFromDraft,
+  togglePlanDay,
+  usePlanRows,
+  usePlans,
+} from './data'
 
 const DRAFT_KEY = 'trainer-plan-draft'
 const NAME_KEY = 'trainer-plan-draft-name'
@@ -26,6 +38,25 @@ function loadDraft(): DraftItem[] {
     return []
   }
 }
+
+let cardSeq = 0
+const blankCard = (group: string, name: string): CustomCard => ({
+  id: `card-${++cardSeq}`,
+  group,
+  name,
+  exercises: [],
+})
+
+const groupOf = (c: PlanTemplate | 'custom') => (c === 'custom' ? 'own' : c.id)
+const defaultCardName = (c: PlanTemplate | 'custom', n: number) =>
+  c === 'custom' ? '' : `Custom ${c.name}${n > 0 ? ` ${n + 1}` : ''}`
+
+const customSource = (c: CustomCard): WorkoutSource => ({
+  kind: 'custom',
+  name: c.name,
+  ...(c.group === 'own' ? {} : { templateId: c.group }),
+  exercises: c.exercises,
+})
 
 /**
  * Build a plan: pick a workout type → pick a workout → tap the day(s) it's on. Repeat, then save.
@@ -39,8 +70,19 @@ export function PlanBuilderScreen() {
   const [draft, setDraft] = useState<DraftItem[]>(() => (planId ? [] : loadDraft()))
   const [planName, setPlanName] = useState(() => sessionStorage.getItem(NAME_KEY) ?? '')
   const [category, setCategory] = useState<PlanTemplate | 'custom' | null>(null)
-  const [customName, setCustomName] = useState('')
-  const [customs, setCustoms] = useState<string[]>([])
+  // Your own workouts, made under a type ("Custom Push") or from "Create your own"
+  const [cards, setCards] = useState<CustomCard[]>(() =>
+    draft.flatMap((d) =>
+      d.source.kind === 'custom'
+        ? [
+            {
+              ...blankCard(d.source.templateId ?? 'own', d.source.name),
+              exercises: d.source.exercises ?? [],
+            },
+          ]
+        : [],
+    ),
+  )
   const [saving, setSaving] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
@@ -80,6 +122,43 @@ export function PlanBuilderScreen() {
     showToast({
       message: added ? `${title} added to plan (${day})` : `${title} removed from ${day}`,
     })
+  }
+
+  function openCategory(c: PlanTemplate | 'custom') {
+    const group = groupOf(c)
+    if (!cards.some((x) => x.group === group))
+      setCards([...cards, blankCard(group, defaultCardName(c, 0))])
+    setCategory(c)
+  }
+
+  function addCard(c: PlanTemplate | 'custom') {
+    const n = cards.filter((x) => x.group === groupOf(c)).length
+    setCards([...cards, blankCard(groupOf(c), defaultCardName(c, n))])
+  }
+
+  /** The saved-plan workout a card became (add mode), if it's been put on a day yet. */
+  const savedSessionFor = (c: CustomCard) =>
+    existing?.sessions.find((s) => s.name.toLowerCase() === c.name.trim().toLowerCase())
+
+  async function changeCard(next: CustomCard, picked?: { exercise: Exercise; added: boolean }) {
+    const prev = cards.find((x) => x.id === next.id)
+    if (!prev) return
+    setCards(cards.map((x) => (x.id === next.id ? next : x)))
+    if (!planId) {
+      setDraft((d) => replaceDraftSource(d, sourceKey(customSource(prev)), customSource(next)))
+      return
+    }
+    // Already in the saved plan: keep its exercises in step
+    const session = savedSessionFor(prev)
+    if (!session || !picked) return
+    if (picked.added) {
+      await addPlanExercise(session.id, picked.exercise, asLogType(picked.exercise.log_type))
+    } else {
+      const pe = existing?.exercises.find(
+        (e) => e.plan_session_id === session.id && e.exercise_id === picked.exercise.id,
+      )
+      if (pe) await removePlanExercise(pe)
+    }
   }
 
   function leave() {
@@ -152,16 +231,24 @@ export function PlanBuilderScreen() {
           {[...TEMPLATES]
             .toSorted((a, b) => Number(Boolean(b.suggested)) - Number(Boolean(a.suggested)))
             .map((t) => {
-              const chosen = t.sessions.filter((s) =>
-                items.some(
-                  (i) => i.title.toLowerCase() === versionTitle(t.name, s.name).toLowerCase(),
-                ),
-              )
+              const chosen = [
+                ...t.sessions
+                  .map((s) => versionTitle(t.name, s.name))
+                  .filter((title) =>
+                    items.some((i) => i.title.toLowerCase() === title.toLowerCase()),
+                  ),
+                ...cards
+                  .filter((c) => c.group === t.id)
+                  .map((c) => c.name.trim())
+                  .filter((name) =>
+                    items.some((i) => i.title.toLowerCase() === name.toLowerCase()),
+                  ),
+              ]
               return (
                 <li key={t.id}>
                   <button
                     type="button"
-                    onClick={() => setCategory(t)}
+                    onClick={() => openCategory(t)}
                     className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left active:opacity-80"
                   >
                     <span className="text-2xl">{t.sessions[0]?.emoji}</span>
@@ -170,7 +257,7 @@ export function PlanBuilderScreen() {
                       <span className="block text-sm text-muted">{t.description}</span>
                       {chosen.length > 0 && (
                         <span className="mt-1 block text-xs font-semibold text-accent">
-                          ✓ In plan: {chosen.map((s) => versionTitle(t.name, s.name)).join(', ')}
+                          ✓ In plan: {chosen.join(', ')}
                         </span>
                       )}
                     </span>
@@ -182,14 +269,14 @@ export function PlanBuilderScreen() {
           <li>
             <button
               type="button"
-              onClick={() => setCategory('custom')}
+              onClick={() => openCategory('custom')}
               className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-border p-4 text-left"
             >
               <span className="text-2xl">✏️</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-lg font-bold">Create your own</span>
                 <span className="block text-sm text-muted">
-                  Name it, pick a day, then add your exercises.
+                  Name it, choose its exercises, then pick a day.
                 </span>
               </span>
               <span className="text-2xl text-muted">›</span>
@@ -236,44 +323,39 @@ export function PlanBuilderScreen() {
         </div>
       )}
 
-      {/* Step 2b: your own workout */}
-      {category === 'custom' && (
+      {/* Step 2b: your own workouts, under a type or from scratch */}
+      {category && (
         <div className="flex flex-col gap-3">
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const name = customName.trim()
-              if (name && !customs.includes(name)) setCustoms([...customs, name])
-              setCustomName('')
-            }}
+          {category !== 'custom' && (
+            <h2 className="mt-2 text-xs font-semibold tracking-wide text-muted uppercase">
+              Or make your own {category.name}
+            </h2>
+          )}
+          {cards
+            .filter((c) => c.group === groupOf(category))
+            .map((c) => {
+              const source = customSource(c)
+              return (
+                <CustomWorkoutCard
+                  key={c.id}
+                  card={c}
+                  placeholder={
+                    category === 'custom' ? 'Name, e.g. Arms' : `Custom ${category.name}`
+                  }
+                  nameLocked={Boolean(planId && savedSessionFor(c))}
+                  days={c.name.trim() ? daysFor(source) : []}
+                  onChange={(next, picked) => void changeCard(next, picked)}
+                  onToggleDay={(d) => void toggle(source, d)}
+                />
+              )
+            })}
+          <button
+            type="button"
+            onClick={() => addCard(category)}
+            className="h-11 text-sm font-semibold text-accent"
           >
-            <input
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              placeholder="Name, e.g. Arms"
-              className="h-12 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={!customName.trim()}
-              className="h-12 rounded-xl bg-accent px-4 font-bold text-accent-fg disabled:opacity-40"
-            >
-              Add
-            </button>
-          </form>
-          {customs.map((name) => {
-            const source: WorkoutSource = { kind: 'custom', name }
-            return (
-              <section key={name} className="rounded-3xl bg-surface p-4">
-                <h2 className="text-xl font-bold">{name}</h2>
-                <p className="text-sm text-muted">
-                  Starts empty — add exercises from the plan once it’s saved.
-                </p>
-                <DayButtons selected={daysFor(source)} onToggle={(d) => void toggle(source, d)} />
-              </section>
-            )
-          })}
+            + Another {category === 'custom' ? 'workout of your own' : `custom ${category.name}`}
+          </button>
         </div>
       )}
 
@@ -333,34 +415,6 @@ export function PlanBuilderScreen() {
           void navigate('/plans', { replace: true })
         }}
       />
-    </div>
-  )
-}
-
-function DayButtons({ selected, onToggle }: { selected: number[]; onToggle: (d: number) => void }) {
-  return (
-    <div className="mt-4">
-      <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
-        {selected.length ? 'On' : 'Add to plan on'}
-      </p>
-      <div className="grid grid-cols-7 gap-1">
-        {DAY_NAMES.map((d, i) => {
-          const on = selected.includes(i + 1)
-          return (
-            <button
-              key={d}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onToggle(i + 1)}
-              className={`h-11 rounded-lg text-xs font-bold ${
-                on ? 'bg-accent text-accent-fg' : 'bg-surface-2 text-muted'
-              }`}
-            >
-              {d}
-            </button>
-          )
-        })}
-      </div>
     </div>
   )
 }

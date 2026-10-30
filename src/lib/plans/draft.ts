@@ -5,13 +5,24 @@ import {
   type Ctx,
   type PlanRows,
 } from './instantiate'
+import type { TargetLike } from './targets'
 import { TEMPLATES, versionTitle, type TemplateSession } from './templates'
 
 export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
-/** Where a workout in a plan came from: a preset (e.g. Push A) or the user's own. */
+/** An exercise the user picked for their own workout, with its starting set targets. */
+export interface CustomExercise {
+  exerciseId: string
+  targets: TargetLike[]
+}
+
+/**
+ * Where a workout in a plan came from: a preset (e.g. Push A) or the user's own, optionally made
+ * under a workout type (e.g. "Custom Push") with the exercises they picked.
+ */
 export type WorkoutSource =
-  { kind: 'preset'; templateId: string; version: string } | { kind: 'custom'; name: string }
+  | { kind: 'preset'; templateId: string; version: string }
+  | { kind: 'custom'; name: string; templateId?: string; exercises?: CustomExercise[] }
 
 export interface DraftItem {
   /** Stable identity of the source, e.g. "preset:push:A" or "custom:arms" */
@@ -32,6 +43,26 @@ export function presetFor(s: WorkoutSource): TemplateSession | null {
   if (s.kind !== 'preset') return null
   return (
     TEMPLATES.find((t) => t.id === s.templateId)?.sessions.find((v) => v.name === s.version) ?? null
+  )
+}
+
+export function emojiFor(s: WorkoutSource): string | null {
+  if (s.kind === 'preset') return presetFor(s)?.emoji ?? null
+  return TEMPLATES.find((t) => t.id === s.templateId)?.sessions[0]?.emoji ?? null
+}
+
+/** Custom exercises to copy into the plan (presets bring their own). */
+export const customExercisesOf = (s: WorkoutSource): readonly CustomExercise[] =>
+  s.kind === 'custom' ? (s.exercises ?? []) : []
+
+/** Swaps in a new version of a workout's source (e.g. exercises changed), keeping its days. */
+export function replaceDraftSource(
+  draft: readonly DraftItem[],
+  oldKey: string,
+  source: WorkoutSource,
+): DraftItem[] {
+  return draft.map((d) =>
+    d.key === oldKey ? { ...d, key: sourceKey(source), source, title: titleFor(source) } : d,
   )
 }
 
@@ -57,7 +88,7 @@ export function toggleDraftDay(
       key,
       source,
       title: titleFor(source),
-      emoji: presetFor(source)?.emoji ?? null,
+      emoji: emojiFor(source),
       weekdays: [weekday],
     }
     return { draft: [...draft, item], added: true }
@@ -124,6 +155,8 @@ export function buildPlanFromDraft(
       order,
       exerciseIdByName,
       ctx,
+      customExercisesOf(item.source),
+      item.emoji,
     )
     rows.sessions.push(w.session)
     rows.exercises.push(...w.exercises)
