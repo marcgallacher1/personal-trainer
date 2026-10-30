@@ -5,6 +5,8 @@ interface ToastData {
   message: string
   tone: 'default' | 'celebrate'
   action?: { label: string; onClick: () => void }
+  /** 'inline': a screen shows it in place of its main button (see useInlineToast) */
+  placement?: 'floating' | 'inline'
 }
 
 let current: ToastData | null = null
@@ -26,16 +28,24 @@ function dismiss() {
   emit()
 }
 
+const subscribe = (l: () => void) => {
+  listeners.add(l)
+  return () => {
+    listeners.delete(l)
+  }
+}
+const useToast = () => useSyncExternalStore(subscribe, () => current)
+
+/** The current inline toast, for a screen to show over its main button. */
+export function useInlineToast(): ToastData | null {
+  const toast = useToast()
+  return toast?.placement === 'inline' ? toast : null
+}
+
 /** Mounted once in the layout. Sits above the tab bar. */
 export function ToastHost() {
-  const toast = useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => current,
-  )
-  if (!toast) return null
+  const toast = useToast()
+  if (!toast || toast.placement === 'inline') return null
   const celebrate = toast.tone === 'celebrate'
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">

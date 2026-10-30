@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { BackButton } from '../../components/BackButton'
 import { Confirm } from '../../components/Confirm'
 import { Sheet } from '../../components/Sheet'
-import { showToast } from '../../components/Toast'
+import { showToast, useInlineToast } from '../../components/Toast'
 import type { Exercise } from '../../db/queries'
 import { asLogType } from '../../lib/logging/logTypes'
 import {
@@ -121,6 +121,7 @@ export function PlanBuilderScreen() {
     }
     showToast({
       message: added ? `${title} added to plan (${day})` : `${title} removed from ${day}`,
+      placement: 'inline',
     })
   }
 
@@ -171,6 +172,8 @@ export function PlanBuilderScreen() {
   }
 
   const hasActive = (allPlans ?? []).some((p) => p.is_active)
+  // "Push A added to plan (Fri)" covers the Save/Done button for its second, rather than floating over it
+  const inlineToast = useInlineToast()
 
   return (
     <div className="flex flex-col gap-4 pb-28">
@@ -367,7 +370,15 @@ export function PlanBuilderScreen() {
               ? `Your week: ${weekSummary(items)}`
               : 'Nothing added yet — pick a workout, then a day.'}
           </p>
-          {planId ? (
+          {inlineToast ? (
+            <p
+              key={inlineToast.id}
+              role="status"
+              className="flex h-12 items-center justify-center truncate rounded-xl bg-text px-4 font-semibold text-bg"
+            >
+              {inlineToast.message}
+            </p>
+          ) : planId ? (
             <button
               type="button"
               onClick={() => void navigate(`/plans/${planId}`, { replace: true })}
