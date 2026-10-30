@@ -22,6 +22,7 @@ import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
 import { ProgressScreen } from '../features/progress/ProgressScreen'
 import { TodayScreen } from '../features/today/TodayScreen'
+import { BootScreen } from './BootScreen'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Layout } from './Layout'
 
@@ -79,7 +80,7 @@ function Gate() {
       />
     )
   }
-  if (loading) return null
+  if (loading) return <BootScreen waitingFor="sign-in" />
   if (!session) return <SignInScreen />
   return <SignedIn userId={session.user.id} />
 }
@@ -87,19 +88,26 @@ function Gate() {
 /** Binds local data to the signed-in user and runs background sync while signed in. */
 function SignedIn({ userId }: { userId: string }) {
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     setCurrentUserId(userId)
     let stop: (() => void) | undefined
-    void claimLocalData(userId).then(() => {
-      setReady(true)
-      stop = startSyncLoop()
-    })
+    claimLocalData(userId)
+      .then(() => {
+        setReady(true)
+        stop = startSyncLoop()
+      })
+      .catch((e: unknown) =>
+        setError(
+          `Couldn’t open the workout storage on this phone (${e instanceof Error ? e.message : String(e)}).`,
+        ),
+      )
     return () => {
       stop?.()
       setCurrentUserId(null)
     }
   }, [userId])
-  if (!ready) return null
+  if (!ready) return <BootScreen waitingFor="workout storage" error={error ?? undefined} />
   return <RouterProvider router={router} />
 }
 

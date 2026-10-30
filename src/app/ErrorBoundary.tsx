@@ -1,3 +1,4 @@
+import { resetAppCache } from './BootScreen'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface State {
@@ -31,6 +32,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           onClick={() => window.location.reload()}
         >
           Reload
+        </button>
+        <button
+          className="h-12 rounded-xl bg-surface font-semibold"
+          onClick={() => void resetAppCache()}
+        >
+          Reset app (keeps your workouts)
         </button>
       </div>
     )

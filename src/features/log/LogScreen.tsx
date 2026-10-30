@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
-import { Button } from '../../components/Button'
 import {
   useActiveSession,
   useExercises,
@@ -10,13 +9,12 @@ import {
 } from '../../db/queries'
 import { monthGrid, shiftMonth } from '../../lib/time/calendar'
 import { cardioName } from '../../lib/cardio'
-import { StartPlanSheet } from '../plans/StartPlanSheet'
+import { LogWorkoutButton } from '../plans/LogWorkoutButton'
 import { formatDuration, londonDate, sessionTitle } from './format'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 export function LogScreen() {
-  const [choosing, setChoosing] = useState(false)
   const active = useActiveSession()
   const summaries = useSessionSummaries()
   const exercises = useExercises()
@@ -64,11 +62,8 @@ export function LogScreen() {
           <p className="mt-1 font-semibold">Resume ›</p>
         </Link>
       ) : (
-        <Button className="h-16 text-xl" onClick={() => setChoosing(true)}>
-          Start plan
-        </Button>
+        <LogWorkoutButton />
       )}
-      <StartPlanSheet open={choosing} onClose={() => setChoosing(false)} />
 
       <section className="rounded-3xl bg-surface p-4">
         <div className="mb-3 flex items-center justify-between">

@@ -17,6 +17,7 @@ import { TEMPLATES, versionTitle, type PlanTemplate } from '../../lib/plans/temp
 import { savePlanFromDraft, togglePlanDay, usePlanRows, usePlans } from './data'
 
 const DRAFT_KEY = 'trainer-plan-draft'
+const NAME_KEY = 'trainer-plan-draft-name'
 
 function loadDraft(): DraftItem[] {
   try {
@@ -36,6 +37,7 @@ export function PlanBuilderScreen() {
   const existing = usePlanRows(planId)
   const allPlans = usePlans()
   const [draft, setDraft] = useState<DraftItem[]>(() => (planId ? [] : loadDraft()))
+  const [planName, setPlanName] = useState(() => sessionStorage.getItem(NAME_KEY) ?? '')
   const [category, setCategory] = useState<PlanTemplate | 'custom' | null>(null)
   const [customName, setCustomName] = useState('')
   const [customs, setCustoms] = useState<string[]>([])
@@ -43,8 +45,10 @@ export function PlanBuilderScreen() {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   useEffect(() => {
-    if (!planId) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-  }, [draft, planId])
+    if (planId) return
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    sessionStorage.setItem(NAME_KEY, planName)
+  }, [draft, planName, planId])
 
   // What's in the plan so far (draft, or the existing plan's workouts and days)
   const items: { key: string; title: string; weekdays: number[] }[] = planId
@@ -127,6 +131,20 @@ export function PlanBuilderScreen() {
             : 'Pick a workout, then choose its day. Repeat for each day you train.'}
         </p>
       </div>
+
+      {!planId && !category && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold tracking-wide text-muted uppercase">
+            Plan name
+          </span>
+          <input
+            value={planName}
+            onChange={(e) => setPlanName(e.target.value)}
+            placeholder="e.g. Upper body block"
+            className="h-12 rounded-xl border border-border bg-surface px-4 text-lg outline-none focus:border-accent"
+          />
+        </label>
+      )}
 
       {/* Step 1: workout types */}
       {!category && (
@@ -291,10 +309,12 @@ export function PlanBuilderScreen() {
       {saving && (
         <SaveSheet
           defaultActive={!hasActive}
+          defaultName={planName.trim() || 'My plan'}
           onCancel={() => setSaving(false)}
           onSave={async (name, active) => {
             const id = await savePlanFromDraft(name, draft, active)
             sessionStorage.removeItem(DRAFT_KEY)
+            sessionStorage.removeItem(NAME_KEY)
             showToast({ message: active ? 'Plan saved and active' : 'Plan saved' })
             void navigate(`/plans/${id}`, { replace: true })
           }}
@@ -309,6 +329,7 @@ export function PlanBuilderScreen() {
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={() => {
           sessionStorage.removeItem(DRAFT_KEY)
+          sessionStorage.removeItem(NAME_KEY)
           void navigate('/plans', { replace: true })
         }}
       />
@@ -346,14 +367,16 @@ function DayButtons({ selected, onToggle }: { selected: number[]; onToggle: (d: 
 
 function SaveSheet({
   defaultActive,
+  defaultName,
   onCancel,
   onSave,
 }: {
   defaultActive: boolean
+  defaultName: string
   onCancel: () => void
   onSave: (name: string, active: boolean) => Promise<void>
 }) {
-  const [name, setName] = useState('My plan')
+  const [name, setName] = useState(defaultName)
   const [active, setActive] = useState(defaultActive)
   const [busy, setBusy] = useState(false)
   return (

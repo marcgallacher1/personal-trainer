@@ -6,7 +6,6 @@ import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
 import { DAY_NAMES, weekOf } from '../../lib/plans/draft'
 import {
-  archivePlan,
   deletePlan,
   deletePlanSession,
   duplicatePlan,
@@ -167,13 +166,6 @@ export function PlanEditorScreen() {
             }}
           >
             Duplicate
-          </button>
-          <button
-            type="button"
-            className="h-12 rounded-xl bg-surface font-semibold"
-            onClick={() => void archivePlan(plan, !plan.archived)}
-          >
-            {plan.archived ? 'Unarchive' : 'Archive'}
           </button>
           <button
             type="button"

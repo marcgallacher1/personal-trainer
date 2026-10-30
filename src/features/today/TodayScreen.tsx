@@ -1,26 +1,20 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
-import { Button } from '../../components/Button'
 import { useActiveSession, useSessionSummaries } from '../../db/queries'
-import { isoWeekday, weekProgress, weekStart, type WorkoutRef } from '../../lib/plans/schedule'
-import { startSession } from '../log/actions'
+import { weekProgress, weekStart, type WorkoutRef } from '../../lib/plans/schedule'
 import { formatDuration, londonDate, sessionTitle } from '../log/format'
-import { startFromPlan, usePlanLibrary, useProfile } from '../plans/data'
-import { StartPlanSheet } from '../plans/StartPlanSheet'
+import { useProfile } from '../plans/data'
+import { LogWorkoutButton } from '../plans/LogWorkoutButton'
 import { WEEKDAYS } from '../plans/WeekdayPicker'
 
 export function TodayScreen() {
-  const navigate = useNavigate()
   const active = useActiveSession()
   const summaries = useSessionSummaries()
-  const library = usePlanLibrary()
   const profile = useProfile()
   const [now] = useState(() => new Date())
-  const [choosing, setChoosing] = useState(false)
 
   const today = londonDate(now.toISOString())
-  const weekday = isoWeekday(today)
   const workouts: WorkoutRef[] = (summaries ?? []).map((s) => ({
     plan_session_id: s.session.plan_session_id,
     started_at: s.session.started_at,
@@ -29,21 +23,6 @@ export function TodayScreen() {
   }))
   const week = weekProgress(workouts, today, profile?.sessions_per_week ?? 4)
   const last = summaries?.find((s) => s.session.ended_at !== null)
-  const trainedToday = workouts.some((w) => w.day === today && w.active)
-  // Only the active plan drives Today; no active plan = just log freely
-  const scheduled = (library ?? [])
-    .filter((p) => p.plan.is_active)
-    .flatMap((p) =>
-      p.versions
-        .filter((v) => p.schedule.some((s) => s.plan_session_id === v.id && s.weekday === weekday))
-        .map((v) => ({ plan: p.plan, version: v })),
-    )
-
-  async function go(start: () => Promise<string>) {
-    const id = await start()
-    void navigate(`/log/session/${id}`)
-  }
-
   const heading = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -69,34 +48,7 @@ export function TodayScreen() {
           </Link>
         ) : (
           <section className="flex flex-col gap-2">
-            {!trainedToday &&
-              scheduled.map(({ plan, version }) => (
-                <button
-                  key={version.id}
-                  type="button"
-                  onClick={() => void go(() => startFromPlan(version))}
-                  className="flex items-center gap-3 rounded-3xl bg-accent/15 p-4 text-left ring-2 ring-accent"
-                >
-                  <span className="text-3xl">{version.emoji ?? '🏋️'}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold tracking-wide text-accent uppercase">
-                      {plan.name} · {WEEKDAYS[weekday - 1]}
-                    </span>
-                    <span className="block text-xl font-bold">Start {version.name}</span>
-                  </span>
-                  <span className="text-2xl text-accent">›</span>
-                </button>
-              ))}
-            <Button className="h-16 text-xl" onClick={() => setChoosing(true)}>
-              Start plan
-            </Button>
-            <button
-              type="button"
-              className="h-12 rounded-xl bg-surface font-semibold text-muted"
-              onClick={() => void go(startSession)}
-            >
-              Empty workout
-            </button>
+            <LogWorkoutButton />
           </section>
         )}
 
@@ -118,8 +70,6 @@ export function TodayScreen() {
           </Link>
         )}
       </div>
-
-      <StartPlanSheet open={choosing} onClose={() => setChoosing(false)} />
     </>
   )
 }

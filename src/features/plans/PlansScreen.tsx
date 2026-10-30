@@ -2,9 +2,11 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useNavigate } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
+import { showToast } from '../../components/Toast'
 import { db } from '../../db/local'
 import { weekSummary } from '../../lib/plans/draft'
-import { usePlans } from './data'
+import type { PlanRow } from '../../lib/plans/instantiate'
+import { setPlanActive, usePlans } from './data'
 
 export function PlansScreen() {
   const navigate = useNavigate()
@@ -26,11 +28,6 @@ export function PlansScreen() {
     return out
   }, [])
 
-  const visible = (plans ?? [])
-    .filter((p) => !p.archived)
-    .toSorted((a, b) => Number(b.is_active) - Number(a.is_active))
-  const archived = (plans ?? []).filter((p) => p.archived)
-
   return (
     <div className="flex flex-col gap-4">
       <PageTitle>Plans</PageTitle>
@@ -38,55 +35,67 @@ export function PlansScreen() {
       <Button className="h-16 text-xl" onClick={() => void navigate('/plans/new')}>
         Start new plan
       </Button>
-      <p className="-mt-2 text-center text-xs text-muted">
-        Plans are optional — you can always just log workouts as you go.
-      </p>
 
-      {visible.map((p) => {
-        const items = weeks?.get(p.id) ?? []
-        const summary = weekSummary(items)
-        return (
-          <Link
-            key={p.id}
-            to={`/plans/${p.id}`}
-            className={`block rounded-2xl p-4 active:opacity-80 ${
-              p.is_active ? 'bg-accent/10 ring-2 ring-accent' : 'bg-surface'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-lg font-bold">{p.name}</p>
-              {p.is_active && (
-                <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-fg">
-                  ACTIVE
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted">
-              {summary ||
-                (items.length
-                  ? `${items.length} workout${items.length === 1 ? '' : 's'}, no days set`
-                  : 'No workouts yet')}
-            </p>
-          </Link>
-        )
-      })}
-
-      {archived.length > 0 && (
-        <section>
-          <h2 className="mt-2 mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
-            Archived
-          </h2>
-          {archived.map((p) => (
-            <Link
-              key={p.id}
-              to={`/plans/${p.id}`}
-              className="mb-2 block rounded-2xl bg-surface p-4 opacity-70"
-            >
-              <p className="truncate font-semibold">{p.name}</p>
-            </Link>
-          ))}
-        </section>
-      )}
+      {(plans ?? []).map((p) => (
+        <PlanCard key={p.id} plan={p} summary={weekSummary(weeks?.get(p.id) ?? [])} />
+      ))}
     </div>
+  )
+}
+
+function PlanCard({ plan, summary }: { plan: PlanRow; summary: string }) {
+  const on = plan.is_active
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl p-4 ${
+        on ? 'bg-accent/10 ring-2 ring-accent' : 'bg-surface'
+      }`}
+    >
+      <Link to={`/plans/${plan.id}`} className="min-w-0 flex-1 active:opacity-70">
+        <p className="truncate text-lg font-bold">{plan.name}</p>
+        <p className={`truncate text-sm ${on ? 'text-text' : 'text-muted'}`}>
+          {summary || 'No days set yet'}
+        </p>
+      </Link>
+      <Slider
+        on={on}
+        label={`${plan.name} active`}
+        onChange={(v) =>
+          void setPlanActive(plan, v).then(() =>
+            showToast({ message: v ? `${plan.name} is now active` : `${plan.name} switched off` }),
+          )
+        }
+      />
+    </div>
+  )
+}
+
+/** Small on/off slider. */
+export function Slider({
+  on,
+  label,
+  onChange,
+}: {
+  on: boolean
+  label: string
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+        on ? 'bg-accent' : 'bg-surface-2 ring-1 ring-border'
+      }`}
+    >
+      <span
+        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${
+          on ? 'left-7' : 'left-1'
+        }`}
+      />
+    </button>
   )
 }
