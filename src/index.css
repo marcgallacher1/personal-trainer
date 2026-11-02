@@ -13,6 +13,13 @@
   --color-danger: #dc2626;
   --color-success: #16a34a;
   --color-warn: #d97706;
+  /* Chart series (validated categorical order: muscle groups use slots 1–6) */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,6 +35,12 @@
     --color-danger: #f87171;
     --color-success: #4ade80;
     --color-warn: #fbbf24;
+    --color-series-1: #3987e5;
+    --color-series-2: #d95926;
+    --color-series-3: #199e70;
+    --color-series-4: #c98500;
+    --color-series-5: #d55181;
+    --color-series-6: #008300;
   }
 }
 

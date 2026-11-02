@@ -21,6 +21,8 @@ import { PlanHistoryScreen } from '../features/plans/PlanHistoryScreen'
 import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
 import { RatingScreen } from '../features/plans/RatingScreen'
+import { MuscleScreen } from '../features/progress/MuscleScreen'
+import { PlanFollowScreen } from '../features/progress/PlanFollowScreen'
 import { ProgressScreen } from '../features/progress/ProgressScreen'
 import { TodayScreen } from '../features/today/TodayScreen'
 import { BootScreen } from './BootScreen'
@@ -39,6 +41,8 @@ const router = createBrowserRouter([
       { path: '/exercises/:id', element: <ExerciseDetailScreen /> },
       { path: '/exercises/:id/edit', element: <ExerciseFormScreen /> },
       { path: '/progress', element: <ProgressScreen /> },
+      { path: '/progress/plan', element: <PlanFollowScreen /> },
+      { path: '/progress/muscles', element: <MuscleScreen /> },
       { path: '/plans', element: <PlansScreen /> },
       { path: '/plans/new', element: <PlanBuilderScreen /> },
       { path: '/plans/:planId', element: <PlanEditorScreen /> },

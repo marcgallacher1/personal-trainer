@@ -1,12 +1,16 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { ComingSoon } from '../../components/ComingSoon'
+import { Confirm } from '../../components/Confirm'
+import { showToast } from '../../components/Toast'
 import { useOutboxCount } from '../../db/queries'
 import { supabase } from '../../db/supabase'
 import { clearLocalData } from '../../db/sync'
 import { useAuth } from '../auth/AuthProvider'
+import { countSampleWorkouts, loadSampleWorkouts, removeSampleWorkouts } from './sample'
 
 async function signOut() {
   await supabase.auth.signOut()
@@ -38,6 +42,8 @@ export function MoreScreen() {
 
         <ComingSoon phase="Phases 4–8">Reports, Data and Settings will live here.</ComingSoon>
 
+        <SampleData />
+
         <section className="rounded-2xl bg-surface p-4">
           <p className="text-sm text-muted">Signed in as</p>
           <p className="truncate text-lg">{session?.user.email}</p>
@@ -68,5 +74,57 @@ export function MoreScreen() {
         <p className="text-center text-xs text-muted">Trainer v{__APP_VERSION__}</p>
       </div>
     </>
+  )
+}
+
+/** Fake workout history for trying out Progress; tagged so it can be removed cleanly. */
+function SampleData() {
+  const count = useLiveQuery(countSampleWorkouts, [])
+  const [busy, setBusy] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  if (count === undefined) return null
+
+  async function run(task: () => Promise<number>, done: (n: number) => string) {
+    setBusy(true)
+    try {
+      showToast({ message: done(await task()) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="rounded-2xl bg-surface p-4">
+      <p className="text-lg font-bold">Sample workouts</p>
+      <p className="mb-3 text-sm text-muted">
+        {count
+          ? `${count} sample workouts are loaded. They’re tagged, so removing them never touches workouts you logged yourself.`
+          : 'Fill Progress with 12 weeks of made-up workouts that follow your active plan, to see how the charts work.'}
+      </p>
+      {count ? (
+        <Button variant="secondary" disabled={busy} onClick={() => setConfirmRemove(true)}>
+          {busy ? 'Working…' : 'Remove sample workouts'}
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={() => void run(loadSampleWorkouts, (n) => `Added ${n} sample workouts`)}
+        >
+          {busy ? 'Adding…' : 'Load sample workouts'}
+        </Button>
+      )}
+      <Confirm
+        open={confirmRemove}
+        title={`Remove ${count} sample workouts?`}
+        body="Only the generated sample workouts are removed."
+        confirmLabel="Remove"
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false)
+          void run(removeSampleWorkouts, (n) => `Removed ${n} sample workouts`)
+        }}
+      />
+    </section>
   )
 }
