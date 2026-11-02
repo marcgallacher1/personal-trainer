@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet, useNavigate } from 'react-router'
+import { Outlet, ScrollRestoration, useNavigate } from 'react-router'
 import { SyncPill } from '../components/SyncPill'
 import { ToastHost } from '../components/Toast'
 import { TabBar } from './TabBar'
@@ -26,6 +26,8 @@ export function Layout() {
         <Outlet />
       </main>
       <ToastHost />
+      {/* New screens open at the top; going back returns to where you were */}
+      <ScrollRestoration />
       <TabBar />
     </div>
   )
