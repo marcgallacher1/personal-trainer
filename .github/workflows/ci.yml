@@ -27,7 +27,7 @@ jobs:
           npm run gen:shared
           git diff --exit-code supabase/functions/_shared
       - name: Typecheck Edge Functions
-        run: npx --yes deno@2.1.4 check supabase/functions/notify/index.ts supabase/functions/test-push/index.ts
+        run: npx --yes deno@2.1.4 check supabase/functions/notify/index.ts supabase/functions/test-push/index.ts supabase/functions/report-summary/index.ts
         env:
           DENO_NO_PACKAGE_JSON: '1'
       - run: npm run build

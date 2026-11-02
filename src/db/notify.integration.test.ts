@@ -37,7 +37,7 @@ const runNotify = async (now: string) => {
 const myLog = async () => {
   const { data } = await supabase
     .from('notification_log')
-    .select('idempotency_key, status, error')
+    .select('idempotency_key, status, error, payload')
     .order('sent_at')
   return data ?? []
 }
@@ -99,5 +99,15 @@ describe('notify function', () => {
     await runNotify('2026-11-06T15:01:00Z')
     const entry = (await myLog()).find((l) => l.idempotency_key === 'gym:2026-11-06:15:00')
     expect(entry).toMatchObject({ status: 'skipped', error: 'already logged' })
+  })
+
+  it('sends the Sunday rundown with the week so far, opening the report', async () => {
+    const r = await runNotify('2026-11-08T19:01:00Z')
+    expect(r.results[userId]?.sent).toContain('rundown:2026-W45')
+    const entry = (await myLog()).find((l) => l.idempotency_key === 'rundown:2026-W45')
+    expect(entry?.payload).toMatchObject({
+      url: '/reports/2026-W45',
+      body: expect.stringContaining('1 workout this week') as unknown,
+    })
   })
 })

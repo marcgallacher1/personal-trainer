@@ -34,8 +34,8 @@ export interface NotifyState {
   pbWorkouts: { id: string; name: string | null; pbs: string[] }[]
   /** Weeks in a row the weekly target was hit (up to last week) */
   streakWeeks: number
-  /** A weekly report ready for this week, e.g. '2026-W45' */
-  rundown: string | null
+  /** This week so far, for the Sunday rundown */
+  rundown: { week: string; done: number; planned: number | null } | null
   /** Idempotency keys already used */
   sent: ReadonlySet<string>
 }
@@ -325,15 +325,16 @@ export function dueNotifications(s: NotifyState): Due[] {
         break
       }
       case 'weekly_rundown': {
-        if (!s.rundown || !onDay(r)) break
+        const w = s.rundown
+        if (!w || !onDay(r)) break
         for (const t of r.times) {
           if (!isDue(t)) continue
           direct(
             'weekly_rundown',
-            `rundown:${s.rundown}`,
+            `rundown:${w.week}`,
             'Your weekly rundown 📊',
-            'This week’s report is ready. Tap to see how you did.',
-            `/report/${s.rundown}`,
+            rundownBody(w),
+            `/reports/${w.week}`,
           )
         }
         break
@@ -344,6 +345,16 @@ export function dueNotifications(s: NotifyState): Due[] {
     }
   }
   return out
+}
+
+/** "3 of 4 workouts this week. Tap for your 3 things to do next week." */
+export function rundownBody(w: NonNullable<NotifyState['rundown']>): string {
+  const next = 'Tap for 3 things to do next week.'
+  if (w.done === 0) return `No workouts this week. ${next}`
+  if (w.planned && w.done >= w.planned)
+    return `${w.done} of ${w.planned} workouts, full week 💪 ${next}`
+  if (w.planned) return `${w.done} of ${w.planned} workouts this week. ${next}`
+  return `${w.done} workout${w.done === 1 ? '' : 's'} this week. ${next}`
 }
 
 /** "Tomorrow morning is free." / "Thu is free." / "Fold the key lifts into tomorrow's session." */

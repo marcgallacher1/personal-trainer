@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
 import type { PlannedWorkout } from '../../lib/analysis/adherence'
-import { dayNumber, type TrainingSession } from '../../lib/analysis/training'
+import { actualMuscles } from '../../lib/analysis/muscles'
+import type { TrainingSession } from '../../lib/analysis/training'
 import { planWorkouts } from '../../lib/rating/inputs'
-import { ratePlan, type MuscleVolume } from '../../lib/rating/rate'
+import type { MuscleVolume } from '../../lib/rating/rate'
 import { londonDate } from '../log/format'
 import { usePlanLibrary, type PlanWithVersions } from '../plans/data'
 import { useRatingContext, type RatingContext } from '../plans/rating'
@@ -88,48 +89,5 @@ export function musclesFor(
   ctx: RatingContext,
   weeks: number,
 ): MuscleVolume[] {
-  return ratePlan({
-    mode: 'actual',
-    weeks,
-    exercises: ctx.exercises,
-    muscles: ctx.muscles,
-    focus: ctx.focus,
-    workouts: sessions.map((s) => {
-      const byExercise = new Map<
-        string,
-        {
-          set_type: string
-          reps_min: number
-          reps_max: number
-          seconds_min: null
-          seconds_max: null
-          target_rir: number | null
-        }[]
-      >()
-      for (const x of s.sets) {
-        const list = byExercise.get(x.exerciseId) ?? []
-        list.push({
-          set_type: x.setType,
-          reps_min: x.reps,
-          reps_max: x.reps,
-          seconds_min: null,
-          seconds_max: null,
-          target_rir: x.rir,
-        })
-        byExercise.set(x.exerciseId, list)
-      }
-      return {
-        id: s.id,
-        name: s.name ?? 'Workout',
-        timesPerWeek: 1 / weeks,
-        // Real dates, to spot back-to-back days
-        days: [dayNumber(s.date)],
-        exercises: [...byExercise].map(([exerciseId, sets]) => ({
-          id: `${s.id}:${exerciseId}`,
-          exerciseId,
-          sets,
-        })),
-      }
-    }),
-  }).muscles
+  return actualMuscles(sessions, ctx, weeks)
 }

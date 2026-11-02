@@ -76,69 +76,53 @@ async function loadState(db: SupabaseClient, userId: string, now: string): Promi
   const nowMs = Date.parse(now)
   const since = (hours: number) => new Date(nowMs - hours * HOUR).toISOString()
 
-  const [
-    profile,
-    rules,
-    plans,
-    todaySessions,
-    recent,
-    history,
-    bodyweight,
-    protein,
-    sentLog,
-    report,
-  ] = await Promise.all([
-    db.from('profiles').select('*').eq('id', userId).single(),
-    db.from('notification_rules').select('*').eq('user_id', userId).is('deleted_at', null),
-    db
-      .from('plans')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .is('deleted_at', null),
-    db
-      .from('sessions')
-      .select('id')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .gte('started_at', dayStart),
-    db
-      .from('sessions')
-      .select('id, name, started_at, ended_at')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .gte('started_at', since(24)),
-    db
-      .from('sessions')
-      .select('started_at')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .gte('started_at', since(24 * 400)),
-    db
-      .from('bodyweight_logs')
-      .select('kg, date')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('date', { ascending: false })
-      .limit(30),
-    db
-      .from('protein_logs')
-      .select('grams')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .eq('date', today.date),
-    db
-      .from('notification_log')
-      .select('idempotency_key')
-      .eq('user_id', userId)
-      .gte('sent_at', since(72)),
-    db
-      .from('weekly_reports')
-      .select('iso_week')
-      .eq('user_id', userId)
-      .eq('iso_week', isoWeek(today.date))
-      .is('deleted_at', null),
-  ])
+  const [profile, rules, plans, todaySessions, recent, history, bodyweight, protein, sentLog] =
+    await Promise.all([
+      db.from('profiles').select('*').eq('id', userId).single(),
+      db.from('notification_rules').select('*').eq('user_id', userId).is('deleted_at', null),
+      db
+        .from('plans')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .is('deleted_at', null),
+      db
+        .from('sessions')
+        .select('id')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .gte('started_at', dayStart),
+      db
+        .from('sessions')
+        .select('id, name, started_at, ended_at')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .gte('started_at', since(24)),
+      db
+        .from('sessions')
+        .select('started_at')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .gte('started_at', since(24 * 400)),
+      db
+        .from('bodyweight_logs')
+        .select('kg, date')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .limit(30),
+      db
+        .from('protein_logs')
+        .select('grams')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .eq('date', today.date),
+      db
+        .from('notification_log')
+        .select('idempotency_key')
+        .eq('user_id', userId)
+        .gte('sent_at', since(72)),
+    ])
   if (profile.error) throw new Error(profile.error.message)
   const p = profile.data
 
@@ -197,6 +181,11 @@ async function loadState(db: SupabaseClient, userId: string, now: string): Promi
   const open = (recent.data ?? [])
     .filter((s) => !s.ended_at && Date.parse(s.started_at) > nowMs - 12 * HOUR)
     .sort((a, b) => b.started_at.localeCompare(a.started_at))[0]
+  // Workouts so far this week (Mon–Sun), for the rundown
+  const monday = new Date(Date.parse(`${today.date}T00:00:00Z`) - (today.weekday - 1) * 24 * HOUR)
+    .toISOString()
+    .slice(0, 10)
+  const historyDays = (history.data ?? []).map((s) => londonParts(s.started_at).date)
   const weight = Number(bodyweight.data?.[0]?.kg ?? p.bodyweight_kg ?? 0)
   const eaten = (protein.data ?? []).reduce((a, r) => a + Number(r.grams), 0)
 
@@ -218,12 +207,12 @@ async function loadState(db: SupabaseClient, userId: string, now: string): Promi
     bodyweightToday: (bodyweight.data ?? []).some((b) => b.date === today.date),
     protein: { eaten, target: weight ? weight * Number(p.protein_g_per_kg ?? 1.8) : null },
     pbWorkouts,
-    streakWeeks: weeklyStreak(
-      (history.data ?? []).map((s) => londonParts(s.started_at).date),
-      perWeek,
-      today.date,
-    ),
-    rundown: report.data?.[0]?.iso_week ?? null,
+    streakWeeks: weeklyStreak(historyDays, perWeek, today.date),
+    rundown: {
+      week: isoWeek(today.date),
+      done: historyDays.filter((d) => d >= monday).length,
+      planned: plan ? perWeek : null,
+    },
     sent: new Set((sentLog.data ?? []).map((l) => l.idempotency_key)),
   }
 }

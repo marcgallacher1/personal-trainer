@@ -14,7 +14,9 @@ iPhone (standalone PWA)
      ▲ pull "changes since cursor" (server-owned updated_at)
      │
   pg_cron (*/5 min) ──▶ Edge Function `notify` ──▶ Web Push (VAPID) ──▶ Apple push service ──▶ SW `push`
-  pg_cron (Sun 19:00 Europe/London) ──▶ Edge Function `weekly-report` ──▶ weekly_reports + push
+     └─ Sun 19:00: "weekly rundown" push (workouts so far) ──▶ opens /reports/<iso week>
+  Reports screen ──▶ src/lib/report builds the week from local data ──▶ finished weeks saved to weekly_reports
+     └─ optional (VITE_REPORT_AI=on + ANTHROPIC_API_KEY): Edge Function `report-summary` adds a Claude-written note
 ```
 
 ## Principles
@@ -36,6 +38,11 @@ iPhone (standalone PWA)
   evaluation use no DOM or Node APIs, so the server-side engines can share them with the Deno Edge
   Functions (copied into `supabase/functions/_shared`, with a CI check that the copies match). They
   are unit-tested with Vitest.
+- **Weekly reports are built on the phone.** The report is a pure function of the logged data
+  (`src/lib/report/weekly.ts`), so it always matches Progress and reflects late edits. Finished weeks
+  are saved to `weekly_reports` (one row per user and ISO week, with an id derived from both so two
+  devices never clash) for history and the optional AI summary. The rules-based report never
+  depends on the AI.
 - **Time zones.** Times of day are stored as `time` plus an IANA `tz` (default `Europe/London`), and
   are evaluated with DST-aware functions. Naive local times are never stored as UTC.
 - **All scheduling is server-side.** The phone never schedules notifications itself.

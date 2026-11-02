@@ -22,6 +22,8 @@ import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
 import { RatingScreen } from '../features/plans/RatingScreen'
 import { DataScreen } from '../features/data/DataScreen'
+import { ReportScreen } from '../features/reports/ReportScreen'
+import { ReportsScreen } from '../features/reports/ReportsScreen'
 import { refreshPush } from '../features/settings/push'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
 import { SetupWizard } from '../features/settings/SetupWizard'
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
       { path: '/plans/:planId/sessions/:sessionId', element: <PlanSessionScreen /> },
       { path: '/plans/:planId/history', element: <PlanHistoryScreen /> },
       { path: '/plans/:planId/rating', element: <RatingScreen /> },
+      { path: '/reports', element: <ReportsScreen /> },
+      { path: '/reports/:week', element: <ReportScreen /> },
       { path: '/goals', element: <GoalsScreen /> },
       { path: '/more', element: <MoreScreen /> },
       { path: '/settings', element: <SettingsScreen /> },

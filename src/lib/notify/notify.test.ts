@@ -4,6 +4,7 @@ import {
   inQuietHours,
   londonParts,
   reschedule,
+  rundownBody,
   weeklyStreak,
   type NotifyState,
 } from './evaluate'
@@ -254,6 +255,28 @@ describe('celebrations', () => {
 
 const copy = (key: string, goal: { name: string; days: number } | null = null) =>
   pickMessage({ pool: 'gym', tone: 'mix', key, vars: { workout: 'Push A' }, goal })
+
+describe('weekly rundown', () => {
+  const SUN = '2026-11-08'
+  const week = { week: '2026-W45', done: 1, planned: 2 }
+
+  it('sends on Sunday at 19:00 and opens that week’s report', () => {
+    expect(keys(state(`${SUN}T18:59:00Z`, { rundown: week }))).toEqual([])
+    const [d] = dueNotifications(state(`${SUN}T19:00:00Z`, { rundown: week }))
+    expect(d).toMatchObject({ key: 'rundown:2026-W45', url: '/reports/2026-W45', status: 'send' })
+    expect(d!.body).toBe('1 of 2 workouts this week. Tap for 3 things to do next week.')
+  })
+
+  it('only on the chosen day', () => {
+    expect(keys(state(`${MON}T19:00:00Z`, { rundown: week }))).toEqual([])
+  })
+
+  it('words the summary for each kind of week', () => {
+    expect(rundownBody({ week: 'w', done: 0, planned: 2 })).toMatch(/^No workouts this week/)
+    expect(rundownBody({ week: 'w', done: 2, planned: 2 })).toMatch(/^2 of 2 workouts, full week/)
+    expect(rundownBody({ week: 'w', done: 1, planned: null })).toMatch(/^1 workout this week/)
+  })
+})
 
 describe('messages', () => {
   it('is stable for the same notification and varied across them', () => {

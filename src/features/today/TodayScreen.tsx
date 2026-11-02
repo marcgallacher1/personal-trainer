@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { useActiveSession, useSessionSummaries } from '../../db/queries'
 import { weekProgress, weekStart, type WorkoutRef } from '../../lib/plans/schedule'
+import { addDays, weekdayOf } from '../../lib/analysis/training'
+import { isoWeek } from '../../lib/time/london'
 import { formatDuration, londonDate, sessionTitle } from '../log/format'
 import { useProfile } from '../plans/data'
 import { LogWorkoutButton } from '../plans/LogWorkoutButton'
@@ -53,6 +55,8 @@ export function TodayScreen() {
         )}
 
         <WeekCard done={week.done} target={week.target} days={week.days} today={today} />
+
+        <RundownLink today={today} />
 
         {last && (
           <Link to={`/log/session/${last.session.id}`} className="block rounded-2xl bg-surface p-4">
@@ -116,5 +120,27 @@ function WeekCard({
         ))}
       </div>
     </section>
+  )
+}
+
+/** On Sundays and Mondays, a way into the week's report. */
+function RundownLink({ today }: { today: string }) {
+  const day = weekdayOf(today)
+  if (day !== 7 && day !== 1) return null
+  const week = day === 7 ? today : addDays(today, -1)
+  return (
+    <Link
+      to={`/reports/${isoWeek(week)}`}
+      className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+    >
+      <span className="text-2xl">📊</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold">
+          {day === 7 ? 'Your week in review' : 'Last week’s rundown'}
+        </span>
+        <span className="block text-sm text-muted">How it went and 3 things for next week</span>
+      </span>
+      <span className="text-2xl text-muted">›</span>
+    </Link>
   )
 }

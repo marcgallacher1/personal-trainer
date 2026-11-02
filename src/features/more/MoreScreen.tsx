@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
-import { ComingSoon } from '../../components/ComingSoon'
 import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
 import { useOutboxCount } from '../../db/queries'
@@ -26,6 +25,20 @@ export function MoreScreen() {
     <>
       <PageTitle>More</PageTitle>
       <div className="flex flex-col gap-4">
+        <Link
+          to="/reports"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <span className="text-2xl">📊</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-bold">Weekly reports</span>
+            <span className="block text-sm text-muted">
+              How each week went and 3 things to do next
+            </span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+
         <Link
           to="/goals"
           className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
@@ -67,8 +80,6 @@ export function MoreScreen() {
           </span>
           <span className="text-2xl text-muted">›</span>
         </Link>
-
-        <ComingSoon phase="Phases 6–8">Weekly reports will live here.</ComingSoon>
 
         <SampleData />
 
