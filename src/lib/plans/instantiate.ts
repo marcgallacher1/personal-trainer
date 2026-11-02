@@ -144,10 +144,7 @@ export interface WorkoutRows {
   missing: string[]
 }
 
-/**
- * Copies one preset workout (or the user's own, with any exercises they picked) into a plan as a
- * fully editable workout. Unknown preset exercise names are skipped and reported back.
- */
+/** Copies a preset (or your own workout) into a plan. Unknown exercises are skipped and listed. */
 export function instantiateWorkout(
   preset: TemplateSession | null,
   planId: string,

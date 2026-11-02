@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
+import { save, saveOne, type Change } from '../../db/write'
 import { useExerciseMuscleMap, useExercises, useMuscles } from '../../db/queries'
 import { asLogType } from '../../lib/logging/logTypes'
 import type { PlanRows } from '../../lib/plans/instantiate'
@@ -138,6 +139,33 @@ export async function applyFix(planId: string, fix: Fix): Promise<void> {
     const peId = await addPlanExercise(fix.workoutId, exercise, logType)
     const pe = await db.plan_exercises.get(peId)
     if (pe) await setTargets(pe, withWorkingSets(defaultTargets(exercise, logType), fix.sets))
+  } else if (fix.kind === 'move') {
+    const day = (
+      await db.plan_schedule.where('plan_session_id').equals(fix.workoutId).toArray()
+    ).find((d) => live(d) && d.weekday === fix.fromDay)
+    if (!day) throw new Error('That day is no longer in the plan')
+    await saveOne('plan_schedule', { ...day, weekday: fix.toDay })
+  } else if (fix.kind === 'regroup') {
+    // Add moved exercises to the end of their new workout
+    const next = new Map<string, number>()
+    const changes: Change[] = []
+    for (const m of fix.moves) {
+      const pe = await db.plan_exercises.get(m.planExerciseId)
+      if (!pe || pe.deleted_at) continue
+      if (!next.has(m.toWorkoutId)) {
+        const current = (
+          await db.plan_exercises.where('plan_session_id').equals(m.toWorkoutId).toArray()
+        ).filter(live)
+        next.set(m.toWorkoutId, Math.max(-1, ...current.map((e) => e.order)) + 1)
+      }
+      const order = next.get(m.toWorkoutId)!
+      next.set(m.toWorkoutId, order + 1)
+      changes.push({
+        table: 'plan_exercises',
+        row: { ...pe, plan_session_id: m.toWorkoutId, order },
+      })
+    }
+    await save(changes)
   } else {
     const pe = await db.plan_exercises.get(fix.planExerciseId)
     if (!pe) throw new Error('Exercise not found')

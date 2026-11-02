@@ -214,6 +214,14 @@ function Points({ points, onFix }: { points: Point[]; onFix?: (fix: Fix) => Prom
         <li key={p.text} className="flex flex-col gap-2">
           <p>{p.text}</p>
           {p.fix && onFix && <FixRow fix={p.fix} onFix={onFix} />}
+          {p.alternative && onFix && (
+            <>
+              <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+                Or, if you can train another day
+              </p>
+              <FixRow fix={p.alternative} onFix={onFix} />
+            </>
+          )}
         </li>
       ))}
     </ul>

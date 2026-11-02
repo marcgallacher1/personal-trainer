@@ -11,10 +11,7 @@ export interface LinePoint {
   note?: string
 }
 
-/**
- * One series over time: a 2px line, ringed markers for highlights, and a tap/hover crosshair
- * with the exact value. Optional dashed target line.
- */
+/** Line chart over time with highlight markers, tap tooltips and an optional target line. */
 export function LineChart({
   points,
   format,

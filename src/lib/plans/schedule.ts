@@ -14,10 +14,7 @@ export interface WorkoutRef {
   active: boolean
 }
 
-/**
- * Rotation: the session after the most recent workout from this plan (wrapping round).
- * With no history, the first session.
- */
+/** Rotation: the session after the last one done, or the first. */
 export function nextInRotation<T extends SessionRef>(
   sessions: readonly T[],
   workouts: readonly WorkoutRef[],

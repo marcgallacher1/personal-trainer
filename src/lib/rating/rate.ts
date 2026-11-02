@@ -1,16 +1,15 @@
-/**
- * Plan rating: scores a week of training out of 100 with explained sub-scores, what's going well,
- * what's lacking or overdone, and concrete fixes. Pure — the same engine rates a plan (projected
- * week) or the last few weeks of logged training. Paused muscles are left out entirely; priority
- * muscles count double and aim higher.
- */
+/** Rates a plan, or logged training, out of 100 with reasons and fixes. */
 import { isTimed, type LogType } from '../logging/types'
 import type { TargetLike } from '../plans/targets'
 import {
+  BACK_TO_BACK_CREDIT,
   DEFAULT_RANGES,
   FAMILY,
   GENERIC_RANGE,
   PATTERNS,
+  PER_SESSION_MAX,
+  PULL_MUSCLES,
+  PUSH_MUSCLES,
   SUGGEST_FOR_MUSCLE,
   type PatternRule,
 } from './rules'
@@ -33,7 +32,13 @@ export interface RatingWorkout {
   timesPerWeek: number
   /** Plan: ISO weekdays (1–7, repeating weekly). Actual: day numbers (days since epoch). */
   days: readonly number[]
-  exercises: readonly { id: string; exerciseId: string; sets: readonly TargetLike[] }[]
+  exercises: readonly {
+    id: string
+    exerciseId: string
+    sets: readonly TargetLike[]
+    /** Superset group; grouped exercises are moved together by a regroup fix */
+    groupId?: string | null
+  }[]
 }
 
 export interface MuscleGoal {
@@ -101,11 +106,29 @@ export type Fix =
       planExerciseId: string
       sets: number
     }
+  | {
+      /** Move a workout from one weekday to another */
+      kind: 'move'
+      id: string
+      text: string
+      workoutId: string
+      fromDay: number
+      toDay: number
+    }
+  | {
+      /** Re-split two workouts' exercises by muscle group (e.g. push day + pull day) */
+      kind: 'regroup'
+      id: string
+      text: string
+      moves: { planExerciseId: string; toWorkoutId: string }[]
+    }
 
 export interface Point {
   text: string
   muscleId?: string
   fix?: Fix
+  /** A different way to solve the same problem (apply one or the other) */
+  alternative?: Fix
 }
 
 export interface Rating {
@@ -119,12 +142,13 @@ export interface Rating {
   workoutsPerWeek: number
 }
 
+/** See rules.ts for the evidence behind these weights and thresholds. */
 const WEIGHTS: Record<SubScoreId, number> = {
-  volume: 30,
+  volume: 25,
   balance: 15,
   frequency: 15,
   coverage: 10,
-  recovery: 15,
+  recovery: 20,
   goal: 15,
 }
 
@@ -132,6 +156,9 @@ const WEIGHTS: Record<SubScoreId, number> = {
 const HIT = 1.5
 /** Sets in one day that make a muscle need a rest day after. */
 const HEAVY = 4
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+/** Days apart on a weekly cycle (Sun → Mon is 1). */
+const dist = (x: number, y: number) => Math.min(Math.abs(x - y), 7 - Math.abs(x - y))
 const LONG_SESSION_MIN = 90
 /** A little over the top of the range isn't worth flagging */
 const LEEWAY = 1.1
@@ -156,6 +183,16 @@ export function rangeFor(m: Pick<MuscleGoal, 'id' | 'min' | 'max' | 'priority'>)
   const [min, max] = generic ? (DEFAULT_RANGES[m.id] ?? GENERIC_RANGE) : [m.min, m.max]
   // Priority muscles aim for the upper part of their range
   return m.priority ? { min: Math.round(min + (max - min) * 0.4), max } : { min, max }
+}
+
+/** Two workouts on consecutive days that both hit the same muscles hard. */
+interface Clash {
+  first: RatingWorkout
+  second: RatingWorkout
+  /** Day of the first workout, and the day after */
+  day: number
+  nextDay: number
+  muscles: string[]
 }
 
 export function verdictFor(score: number): string {
@@ -184,14 +221,34 @@ export function ratePlan(input: RatingInput): Rating {
     perWorkout.set(w.id, m)
   }
 
+  const prevDay = (d: number) => (input.mode === 'plan' ? ((d + 5) % 7) + 1 : d - 1)
+  /** Times a week a muscle is trained. A session the day after another counts as half. */
+  const spacedFrequency = (muscle: string): number => {
+    const days = new Set<number>()
+    let undated = 0
+    for (const w of workouts) {
+      if ((perWorkout.get(w.id)?.get(muscle) ?? 0) < HIT) continue
+      if (w.days.length) for (const d of w.days) days.add(d)
+      else undated += w.timesPerWeek
+    }
+    let f = 0
+    for (const d of days) f += days.has(prevDay(d)) ? BACK_TO_BACK_CREDIT : 1
+    return (input.mode === 'plan' ? f : f / weeks) + undated
+  }
+
+  /** Weekly sets with anything past the per-session ceiling counting half. */
+  const effective = new Map<string, number>()
   const muscles: MuscleVolume[] = input.muscles.map((goal) => {
     let sets = 0
-    let frequency = 0
+    let eff = 0
     for (const w of workouts) {
       const v = perWorkout.get(w.id)?.get(goal.id) ?? 0
       sets += v * w.timesPerWeek
-      if (v >= HIT) frequency += w.timesPerWeek
+      eff +=
+        (Math.min(v, PER_SESSION_MAX) + 0.5 * Math.max(0, v - PER_SESSION_MAX)) * w.timesPerWeek
     }
+    effective.set(goal.id, eff)
+    const frequency = spacedFrequency(goal.id)
     const { min, max } = rangeFor(goal)
     const s = round1(sets)
     const status: MuscleStatus = goal.paused
@@ -219,15 +276,18 @@ export function ratePlan(input: RatingInput): Rating {
 
   // --- Volume --------------------------------------------------------------
   const volumeScore = weightedMean(
-    trained.map((m) => ({
-      w: weightOf(m),
-      v:
-        m.status === 'ok'
-          ? 1
-          : m.status === 'low'
-            ? m.sets / m.min
-            : Math.max(0, 1 - (m.sets - m.max * LEEWAY) / m.max),
-    })),
+    trained.map((m) => {
+      const eff = effective.get(m.id) ?? m.sets
+      return {
+        w: weightOf(m),
+        v:
+          m.status === 'high'
+            ? Math.max(0, 1 - (m.sets - m.max * LEEWAY) / m.max)
+            : m.min > 0
+              ? Math.min(1, eff / m.min)
+              : 1,
+      }
+    }),
   )
   const inRange = trained.filter((m) => m.status === 'ok')
 
@@ -340,29 +400,44 @@ export function ratePlan(input: RatingInput): Rating {
     : 1
 
   // --- Recovery ------------------------------------------------------------
-  const heavyDays = new Map<string, Set<number>>()
+  const nextDay = (d: number) => (input.mode === 'plan' ? (d % 7) + 1 : d + 1)
+  // Per muscle: the days it gets a hard dose (HEAVY+ sets in one workout), and from which workouts
+  const heavy = new Map<string, Map<number, RatingWorkout[]>>()
   for (const w of workouts) {
     for (const [muscle, sets] of perWorkout.get(w.id) ?? []) {
       if (sets < HEAVY || !activeIds.has(muscle)) continue
-      const days = heavyDays.get(muscle) ?? new Set<number>()
-      for (const d of w.days) days.add(d)
-      heavyDays.set(muscle, days)
+      const byDay = heavy.get(muscle) ?? new Map<number, RatingWorkout[]>()
+      for (const d of w.days) byDay.set(d, [...(byDay.get(d) ?? []), w])
+      heavy.set(muscle, byDay)
     }
   }
-  const backToBack: string[] = []
-  let pairs = 0
-  for (const [muscle, days] of heavyDays) {
+  // Hard sessions for the same muscle on consecutive days, grouped by the pair of workouts
+  const clashes = new Map<string, Clash>()
+  /** Back-to-back hard sessions per week, per muscle */
+  const backToBackRate = new Map<string, number>()
+  for (const [muscle, byDay] of heavy) {
     let n = 0
-    for (const d of days) {
-      const next = input.mode === 'plan' ? (d % 7) + 1 : d + 1
-      if (days.has(next) && next !== d) n++
+    for (const [d, ws] of byDay) {
+      const nd = nextDay(d)
+      const later = nd === d ? undefined : byDay.get(nd)
+      if (!later) continue
+      n++
+      const first = ws[0]!
+      const second = later[0]!
+      const key = `${first.id}>${second.id}@${d}`
+      const c = clashes.get(key) ?? { first, second, day: d, nextDay: nd, muscles: [] }
+      c.muscles.push(muscle)
+      clashes.set(key, c)
     }
-    if (n) {
-      pairs += n
-      backToBack.push(muscles.find((m) => m.id === muscle)?.name ?? muscle)
-    }
+    if (n) backToBackRate.set(muscle, n / weeks)
   }
-  const pairsPerWeek = pairs / weeks
+  const backToBack = trained.filter((m) => backToBackRate.has(m.id))
+  // Share of the muscles you're training that get hammered on back-to-back days
+  const spacingShare = needsFreq.length
+    ? weightedMean(
+        needsFreq.map((m) => ({ w: weightOf(m), v: Math.min(1, backToBackRate.get(m.id) ?? 0) })),
+      )
+    : 0
   const minutes = workouts.map((w) => {
     let seconds = 5 * 60 // warm-up
     for (const pe of w.exercises) {
@@ -374,8 +449,20 @@ export function ratePlan(input: RatingInput): Rating {
   const long = minutes.filter((m) => m.minutes > LONG_SESSION_MIN)
   const recoveryScore = Math.max(
     0,
-    1 - 0.12 * pairsPerWeek - (workouts.length ? (0.4 * long.length) / workouts.length : 0),
+    1 - 0.9 * spacingShare - (workouts.length ? (0.4 * long.length) / workouts.length : 0),
   )
+  // Plan mode: the longest stretch with no training at all (e.g. Mon + Tue, then 5 days off)
+  const trainingDays = [
+    ...new Set(workouts.filter((w) => w.exercises.length).flatMap((w) => w.days)),
+  ].toSorted((a, b) => a - b)
+  const longestRest =
+    input.mode === 'plan' && trainingDays.length > 1
+      ? Math.max(
+          ...trainingDays.map(
+            (d, i) => ((trainingDays[(i + 1) % trainingDays.length]! - d + 7) % 7 || 7) - 1,
+          ),
+        )
+      : 0
 
   // --- Goal fit ------------------------------------------------------------
   let fit = 0
@@ -416,7 +503,7 @@ export function ratePlan(input: RatingInput): Rating {
   if (workouts.length && !missing.some((p) => p.weight >= 1)) {
     strengths.push('All the main movement patterns are covered.')
   }
-  if (workouts.length && pairsPerWeek === 0 && !long.length) {
+  if (workouts.length && backToBack.length === 0 && !long.length) {
     strengths.push(
       'Good recovery: no muscle is hammered on back-to-back days, and sessions are a sensible length.',
     )
@@ -454,16 +541,50 @@ export function ratePlan(input: RatingInput): Rating {
     lacking.push({ text: `No ${p.label} yet.`, fix: fixes.addForPattern(p) })
   }
   for (const c of checks) if (!c.ok) lacking.push({ text: c.bad })
-  for (const m of onceOnly.filter((x) => x.priority || x.status !== 'low').slice(0, 3)) {
+  for (const m of onceOnly
+    .filter((x) => (x.priority || x.status !== 'low') && !backToBackRate.has(x.id))
+    .slice(0, 3)) {
     lacking.push({
       muscleId: m.id,
       text: `${m.name}: trained about once a week — spreading the sets over two days usually works better.`,
     })
   }
   if (backToBack.length) {
-    lacking.push({
-      text: `${backToBack.join(', ')} get hit hard on back-to-back days — a day's rest between helps them recover.`,
-    })
+    const names = backToBack.map((m, i) => (i ? lower(m.name) : m.name))
+    const list =
+      names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+    const worst = [...clashes.values()].toSorted((a, b) => b.muscles.length - a.muscles.length)[0]
+    const when =
+      input.mode === 'plan' && worst
+        ? ` on ${DAYS[worst.day - 1]} and again on ${DAYS[worst.nextDay - 1]}`
+        : ' on back-to-back days'
+    const gap = longestRest >= 4 ? `, then ${longestRest} days off in a row` : ''
+    const point: Point = {
+      text: `${list}: trained hard${when}${gap}. Muscles need roughly 48–72 hours to recover from hard sets, so the second day's sets are done tired. Splitting the work by muscle group, or putting a rest day in between, gets more out of the same sets.`,
+    }
+    if (worst) {
+      const regroup = fixes.regroup(worst)
+      const move = fixes.moveApart(worst, heavy)
+      point.fix = regroup ?? move
+      if (regroup && move) point.alternative = move
+    }
+    // The biggest problem with the plan: say it first
+    if (spacingShare >= 0.3) lacking.unshift(point)
+    else lacking.push(point)
+  }
+  // Too much for one muscle in one session
+  for (const m of trained) {
+    let worst: { w: RatingWorkout; v: number } | null = null
+    for (const w of workouts) {
+      const v = perWorkout.get(w.id)?.get(m.id) ?? 0
+      if (v > PER_SESSION_MAX && (!worst || v > worst.v)) worst = { w, v }
+    }
+    if (worst) {
+      overdone.push({
+        muscleId: m.id,
+        text: `${m.name}: ${fmt(round1(worst.v))} sets in ${worst.w.name}. Past about ${PER_SESSION_MAX} hard sets for one muscle in a session, extra sets add little — they do more on another day.`,
+      })
+    }
   }
   for (const l of long) {
     overdone.push({
@@ -508,10 +629,12 @@ export function ratePlan(input: RatingInput): Rating {
       label: 'Recovery',
       score: pct(recoveryScore),
       summary:
-        pairsPerWeek === 0 && !long.length
+        backToBack.length === 0 && !long.length
           ? 'Good spacing and sensible session lengths.'
           : [
-              backToBack.length ? `${backToBack.length} muscle(s) on back-to-back days` : '',
+              backToBack.length
+                ? `${backToBack.length} muscle${backToBack.length === 1 ? '' : 's'} trained hard on back-to-back days`
+                : '',
               long.length ? `${long.length} long session(s)` : '',
             ]
               .filter(Boolean)
@@ -691,6 +814,94 @@ class FixBuilder {
       workoutId: best.w.id,
       planExerciseId: best.peId,
       sets: best.n - drop,
+    }
+  }
+
+  /** Turns two mixed workouts into a push day and a pull day. Supersets move together. */
+  regroup(c: Clash): Fix | undefined {
+    if (this.input.mode !== 'plan' || c.first.id === c.second.id) return undefined
+    const units = (w: RatingWorkout) => {
+      const map = new Map<string, { ids: string[]; push: number; pull: number }>()
+      for (const pe of w.exercises) {
+        const ex = this.input.exercises.get(pe.exerciseId)
+        const n = working(pe.sets).length
+        const key = pe.groupId ?? pe.id
+        const u = map.get(key) ?? { ids: [], push: 0, pull: 0 }
+        u.ids.push(pe.id)
+        for (const m of ex?.muscles ?? []) {
+          if (PUSH_MUSCLES.includes(m.muscleId)) u.push += n * m.weight
+          if (PULL_MUSCLES.includes(m.muscleId)) u.pull += n * m.weight
+        }
+        map.set(key, u)
+      }
+      return [...map.values()]
+    }
+    const a = units(c.first)
+    const b = units(c.second)
+    const lean = (us: typeof a) => {
+      const push = us.reduce((s, u) => s + u.push, 0)
+      const pull = us.reduce((s, u) => s + u.pull, 0)
+      return { push, pull, mixed: push + pull > 0 && Math.min(push, pull) >= 0.25 * (push + pull) }
+    }
+    const la = lean(a)
+    const lb = lean(b)
+    if (!la.mixed || !lb.mixed) return undefined
+    // The workout already leaning more towards pressing becomes the push day
+    const aIsPush = la.push - la.pull >= lb.push - lb.pull
+    const [pushW, pullW] = aIsPush ? [c.first, c.second] : [c.second, c.first]
+    const [pushUnits, pullUnits] = aIsPush ? [a, b] : [b, a]
+    const moves = [
+      ...pushUnits
+        .filter((u) => u.pull > u.push)
+        .flatMap((u) => u.ids.map((planExerciseId) => ({ planExerciseId, toWorkoutId: pullW.id }))),
+      ...pullUnits
+        .filter((u) => u.push > u.pull)
+        .flatMap((u) => u.ids.map((planExerciseId) => ({ planExerciseId, toWorkoutId: pushW.id }))),
+    ]
+    if (!moves.length) return undefined
+    return {
+      kind: 'regroup',
+      id: `regroup:${c.first.id}:${c.second.id}`,
+      text: `Keep both days, but make ${pushW.name} your push workout (chest, shoulders, triceps) and ${pullW.name} your pull workout (back, biceps, rear delts) — moves ${moves.length} exercise${moves.length === 1 ? '' : 's'}`,
+      moves,
+    }
+  }
+
+  /** Moves the second workout to the day that leaves the clashing muscles the most rest. */
+  moveApart(
+    c: Clash,
+    heavy: ReadonlyMap<string, ReadonlyMap<number, RatingWorkout[]>>,
+  ): Fix | undefined {
+    if (this.input.mode !== 'plan') return undefined
+    const w = c.second
+    const from = c.nextDay
+    // Other hard days for those muscles, once this one has moved
+    const busy = new Set<number>()
+    for (const m of c.muscles) {
+      for (const [d, ws] of heavy.get(m) ?? []) {
+        if (!(d === from && ws.every((x) => x.id === w.id))) busy.add(d)
+      }
+    }
+    const anyTraining = new Set(this.input.workouts.flatMap((x) => x.days))
+    let best: { day: number; gap: number; free: boolean } | null = null
+    for (let t = 1; t <= 7; t++) {
+      if (t === from || w.days.includes(t)) continue
+      const gap = Math.min(...[...busy].map((d) => dist(t, d)))
+      if (gap < 2) continue
+      const free = !anyTraining.has(t)
+      if (!best || gap > best.gap || (gap === best.gap && free && !best.free)) {
+        best = { day: t, gap, free }
+      }
+    }
+    if (!best) return undefined
+    const rest = best.gap - 1
+    return {
+      kind: 'move',
+      id: `move:${w.id}:${from}`,
+      text: `Move ${w.name} from ${DAYS[from - 1]} to ${DAYS[best.day - 1]} (at least ${rest} rest day${rest === 1 ? '' : 's'} in between)`,
+      workoutId: w.id,
+      fromDay: from,
+      toDay: best.day,
     }
   }
 }

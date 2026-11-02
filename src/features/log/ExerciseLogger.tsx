@@ -22,6 +22,7 @@ import {
   formatLoad,
   formatSet,
 } from '../../lib/logging/logTypes'
+import { setNumbers } from '../../lib/logging/numbering'
 import { isTimed, type SetType } from '../../lib/logging/types'
 import {
   deleteSet,
@@ -36,12 +37,6 @@ import { SET_TYPE_INFO, SetEditor, type EditorValue } from './SetEditor'
 export const kg = (n: number) => `${Math.round(n * 100) / 100}`
 const shortDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(iso))
-
-/** Working/drop/failure sets are numbered 1, 2, 3…; warm-ups aren't. */
-export function setNumbers(types: readonly string[]): number[] {
-  let n = 0
-  return types.map((t) => (t === 'warmup' ? 0 : ++n))
-}
 
 interface Props {
   se: SessionExercise
@@ -60,8 +55,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
 
   const logged = sets.map(asLogged)
   const previous = history ? previousPerformance(history.map(asLogged), se.session_id) : null
-  // Each workout starts from blank; within a workout the next set copies the last one logged.
-  // (Last time's numbers are shown for reference only, never prefilled.)
+  // Starts blank; later sets copy the last one. Last time's numbers are only shown.
   const draft = nextDraft(null, logged)
   const numbers = setNumbers(logged.map((s) => s.set_type))
   const nextNumber = numbers.filter(Boolean).length + 1

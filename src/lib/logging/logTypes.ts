@@ -45,7 +45,7 @@ export function formatEffort(s: SetLike, t: LogType): string {
     : `${s.reps}`
 }
 
-/** One set as text: "80 kg × 8", "BW × 12", "BW +10 kg × 8", "20 kg assist × 8", "45 s", "40 kg × 1:00". */
+/** One set as text, e.g. "80 kg × 8" or "45 s". */
 export function formatSet(s: SetLike, t: LogType): string {
   if (t === 'duration') {
     return s.weight_kg > 0

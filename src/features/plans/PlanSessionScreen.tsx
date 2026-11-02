@@ -6,7 +6,7 @@ import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
 import { useExercises, type Exercise } from '../../db/queries'
 import { asLogType } from '../../lib/logging/logTypes'
-import type { PlanExerciseRow } from '../../lib/plans/instantiate'
+import { groupLabels } from '../../lib/plans/groups'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
 import {
@@ -22,20 +22,6 @@ import { WeekdayPicker } from './WeekdayPicker'
 import { PlanExerciseSheet } from './PlanExerciseSheet'
 
 const EMOJIS = ['💪', '🦍', '🔥', '⚡', '🏋️', '🦵', '🍑', '🎯', '🅰️', '🅱️', '⭐', '🚀']
-
-/** Letters for superset groups in display order: A, B, C… */
-export function groupLabels(exercises: readonly PlanExerciseRow[]): Map<string, string> {
-  const labels = new Map<string, string>()
-  const counts = new Map<string, number>()
-  for (const e of exercises) {
-    if (!e.group_id) continue
-    if (!counts.has(e.group_id)) counts.set(e.group_id, 0)
-    const groupLetter = String.fromCharCode(65 + [...counts.keys()].indexOf(e.group_id))
-    counts.set(e.group_id, counts.get(e.group_id)! + 1)
-    labels.set(e.id, `${groupLetter}${counts.get(e.group_id)}`)
-  }
-  return labels
-}
 
 export function PlanSessionScreen() {
   const { planId, sessionId } = useParams()

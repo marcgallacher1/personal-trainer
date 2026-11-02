@@ -1,7 +1,4 @@
-/**
- * Strength over time: best estimated 1RM per workout for each exercise, PBs along the way, and
- * stalls (no new best for 3+ workouts in a row).
- */
+/** Best e1RM per workout, PBs, and stalls (no new best in 3+ workouts). */
 import { e1rm } from './e1rm'
 import { isWorking, type TrainingSession } from './training'
 

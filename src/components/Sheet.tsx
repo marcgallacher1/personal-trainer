@@ -16,7 +16,7 @@ interface Props {
   children: ReactNode
 }
 
-/** Full-height modal sheet (below the status bar) with a scrolling body and optional pinned footer. */
+/** Full-height modal with a scrolling body and optional pinned footer. */
 export function Sheet({
   open,
   bodyRef,

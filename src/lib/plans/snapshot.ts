@@ -41,10 +41,7 @@ export function buildSnapshot(rows: PlanRows): PlanSnapshot {
   }
 }
 
-/**
- * JSON with object keys sorted, so key order (Postgres jsonb reorders keys) never matters.
- * created_at is skipped: the server formats timestamps differently (+00:00 vs Z).
- */
+/** JSON with sorted keys and no created_at, so server and device copies compare equal. */
 function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
   if (value && typeof value === 'object') {

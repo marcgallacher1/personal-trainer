@@ -1,7 +1,4 @@
-/**
- * Training volume: weekly working sets per muscle (secondary movers count half), tonnage, and
- * sets per day for the calendar.
- */
+/** Sets per muscle (secondary muscles count half), tonnage and sets per day. */
 import { isWorking, weekOf, type ExerciseInfo, type TrainingSession } from './training'
 
 /** Muscle groups for stacked charts, in display order. */

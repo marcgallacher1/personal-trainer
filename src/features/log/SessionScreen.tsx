@@ -67,7 +67,7 @@ export function SessionScreen() {
     return ts.length ? describeTargets(ts, lt) : null
   }
 
-  // ?open=<session_exercise_id> opens that exercise's logger (used after creating a custom exercise)
+  // ?open=<id> opens that exercise's logger
   const openId = params.get('open')
   const setOpenId = (seId: string | null) =>
     setParams(seId ? { open: seId } : {}, { replace: true })

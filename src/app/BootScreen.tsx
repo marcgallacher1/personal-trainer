@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/**
- * Clears the cached app files (service worker + caches) and reloads. Workouts in IndexedDB and the
- * sign-in are kept, so nothing logged is lost.
- */
+/** Clears cached app files and reloads. Workouts and sign-in are kept. */
 export async function resetAppCache(): Promise<void> {
   try {
     const regs = (await navigator.serviceWorker?.getRegistrations()) ?? []

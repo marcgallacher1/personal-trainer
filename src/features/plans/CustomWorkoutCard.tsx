@@ -16,10 +16,7 @@ export interface CustomCard {
   exercises: CustomExercise[]
 }
 
-/**
- * Your own workout inside the plan builder: name it, pick its exercises, then tap its day(s).
- * Exercises start with sensible set targets, editable once the plan is saved.
- */
+/** Your own workout in the plan builder: name, exercises, then day(s). */
 export function CustomWorkoutCard({
   card,
   placeholder,

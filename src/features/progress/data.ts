@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
 import type { PlannedWorkout } from '../../lib/analysis/adherence'
-import type { TrainingSession } from '../../lib/analysis/training'
+import { dayNumber, type TrainingSession } from '../../lib/analysis/training'
 import { planWorkouts } from '../../lib/rating/inputs'
 import { ratePlan, type MuscleVolume } from '../../lib/rating/rate'
 import { londonDate } from '../log/format'
@@ -122,7 +122,8 @@ export function musclesFor(
         id: s.id,
         name: s.name ?? 'Workout',
         timesPerWeek: 1 / weeks,
-        days: [],
+        // Real dates, to spot back-to-back days
+        days: [dayNumber(s.date)],
         exercises: [...byExercise].map(([exerciseId, sets]) => ({
           id: `${s.id}:${exerciseId}`,
           exerciseId,

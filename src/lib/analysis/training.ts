@@ -1,7 +1,4 @@
-/**
- * Shared shapes and date helpers for analysis. Dates are London calendar days (YYYY-MM-DD);
- * weeks start on Monday.
- */
+/** Shared types and date helpers. Dates are London days (YYYY-MM-DD); weeks start Monday. */
 import type { RatingExercise } from '../rating/rate'
 
 /** What analysis needs to know about an exercise (same shape the plan rating uses). */

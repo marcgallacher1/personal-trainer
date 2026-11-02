@@ -1,10 +1,4 @@
-/**
- * Preset workouts to help build a plan, grouped by type (Push, Pull, Legs…) with versions A, B…
- * Picking one copies it into the plan as a normal, fully editable workout.
- * Exercise names must match the seeded catalogue (checked by tests).
- *
- * Rep defaults for muscle growth: compounds 6–10 / 8–12 at RIR 1, isolations 10–15 to failure.
- */
+/** Preset workouts by type (Push, Pull…), versions A, B… Names must match the catalogue. */
 
 export interface TemplateExercise {
   name: string

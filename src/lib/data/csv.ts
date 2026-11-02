@@ -80,10 +80,7 @@ const num = (s: string) => (s === '' ? null : Number(s))
 
 const SET_TYPES = ['warmup', 'working', 'drop', 'failure']
 
-/**
- * Turns a sets CSV (as exported) into workouts: rows with the same date, time and workout name
- * become one workout. Unknown exercises and bad rows are reported, not guessed.
- */
+/** Turns a sets CSV into workouts (grouped by date, time and name). Bad rows are reported. */
 export function importSets(
   text: string,
   exerciseIdByName: ReadonlyMap<string, string>,

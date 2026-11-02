@@ -44,9 +44,7 @@ const live = <T extends { deleted_at: string | null }>(r: T) => r.deleted_at ===
 const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order
 const ctx = (): Ctx => ({ userId: requireUserId(), now: nowIso(), newId })
 
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
+// --- Queries ---
 
 export function usePlans(): PlanRow[] | undefined {
   return useLiveQuery(
@@ -69,7 +67,7 @@ export interface PlanWithVersions {
   targets: PlanSetTargetRow[]
 }
 
-/** Every non-archived plan with its versions, schedule, exercises and targets (for the start menu). */
+/** Every non-archived plan with all its rows. */
 export function usePlanLibrary(): PlanWithVersions[] | undefined {
   return useLiveQuery(async () => {
     const plans = (await db.plans.toArray())
@@ -161,9 +159,7 @@ export function useMuscleTargets(): MuscleTarget[] | undefined {
   return useLiveQuery(async () => (await db.muscle_targets.toArray()).filter(live), [])
 }
 
-// ---------------------------------------------------------------------------
-// Plans
-// ---------------------------------------------------------------------------
+// --- Plans ---
 
 const insertAll = (rows: PlanRows): Change[] => [
   { table: 'plans', row: rows.plan },
@@ -195,10 +191,7 @@ export async function updatePlan(plan: PlanRow, patch: Partial<PlanRow>): Promis
   await saveOne('plans', { ...plan, ...patch })
 }
 
-/**
- * Turns a plan on or off. Only one plan is active at a time (switching one on switches the
- * others off). Having no active plan is fine — you can just log workouts as you go.
- */
+/** Turns a plan on or off. Only one can be on at a time. */
 export async function setPlanActive(plan: PlanRow, active: boolean): Promise<void> {
   const fresh = (await db.plans.get(plan.id)) ?? plan
   if (!active) {
@@ -217,10 +210,7 @@ export async function archivePlan(plan: PlanRow, archived: boolean): Promise<voi
   await updatePlan(plan, { archived, is_active: false })
 }
 
-/**
- * Plan builder on an existing plan: tap a day for a workout. Adds the workout (copied from the
- * preset, or empty for your own) if it isn't in the plan yet, otherwise toggles that day.
- */
+/** Toggles a workout's day in a saved plan, adding the workout if it's new. */
 export async function togglePlanDay(
   planId: string,
   source: WorkoutSource,
@@ -328,9 +318,7 @@ export async function duplicatePlan(plan: PlanRow): Promise<string> {
   return copy.plan.id
 }
 
-// ---------------------------------------------------------------------------
-// Sessions & schedule
-// ---------------------------------------------------------------------------
+// --- Sessions & schedule ---
 
 export async function updatePlanSession(
   s: PlanSessionRow,
@@ -392,11 +380,9 @@ export async function toggleWeekday(
   await saveOne('plan_schedule', newScheduleRow(ctx(), planId, sessionId, weekday))
 }
 
-// ---------------------------------------------------------------------------
-// Planned exercises & targets
-// ---------------------------------------------------------------------------
+// --- Planned exercises & targets ---
 
-/** Sensible starting targets: compounds 3 × 8–12 @ RIR 1, isolations 3 × 10–15 to failure, holds 3 × 30–60 s. */
+/** Starting targets: compounds 3 × 8–12, isolations 3 × 10–15, holds 3 × 30–60 s. */
 export function defaultTargets(exercise: Exercise, logType: LogType): TargetLike[] {
   if (isTimed(logType)) return quickSets({ sets: 3, min: 30, max: 60, rir: null }, logType)
   return exercise.is_compound
@@ -490,9 +476,7 @@ export async function unlinkGroup(list: PlanExerciseRow[], pe: PlanExerciseRow):
   )
 }
 
-// ---------------------------------------------------------------------------
-// Versions
-// ---------------------------------------------------------------------------
+// --- Versions ---
 
 /** Saves a new version if the plan differs from its latest saved version. */
 export async function snapshotIfChanged(
@@ -552,9 +536,7 @@ export async function restoreVersion(v: PlanVersionRow): Promise<void> {
   await snapshotIfChanged(v.plan_id, `Restored version ${v.version}`)
 }
 
-// ---------------------------------------------------------------------------
-// Workouts from plans, and edits made during a workout
-// ---------------------------------------------------------------------------
+// --- Workouts from plans, and edits made during a workout ---
 
 /** Starts a workout pre-loaded with a planned workout's exercises (sets stay blank). */
 export async function startFromPlan(planSession: PlanSessionRow): Promise<string> {
@@ -640,9 +622,7 @@ export async function swapExercise(
   if (session) await snapshotIfChanged(session.plan_id, `Swapped to ${replacement.name}`)
 }
 
-// ---------------------------------------------------------------------------
-// Goals
-// ---------------------------------------------------------------------------
+// --- Goals ---
 
 export async function updateProfile(profile: Profile, patch: Partial<Profile>): Promise<void> {
   await saveOne('profiles', { ...profile, ...patch })
@@ -655,14 +635,9 @@ export async function setMuscleFlags(
   await saveOne('muscle_targets', { ...target, ...patch })
 }
 
-// ---------------------------------------------------------------------------
-// Leaving a workout
-// ---------------------------------------------------------------------------
+// --- Leaving a workout ---
 
-/**
- * Cancels a workout that has nothing logged (no sets, no cardio), e.g. started by mistake.
- * Returns true if it was discarded.
- */
+/** Deletes a workout with nothing logged. Returns true if it did. */
 export async function discardIfEmpty(sessionId: string): Promise<boolean> {
   const session = await db.sessions.get(sessionId)
   if (!session || session.deleted_at || session.ended_at) return false

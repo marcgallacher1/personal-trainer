@@ -33,10 +33,7 @@ const toDraft = (
   set_type: s.set_type,
 })
 
-/**
- * Prefilled rows still to do today: the previous session's sets beyond what's already logged.
- * Logging a row is then a single tap when you match last time.
- */
+/** Last session's sets not yet repeated today. */
 export function remainingDrafts(
   previous: PreviousPerformance | null,
   loggedToday: readonly LoggedSet[],
@@ -46,7 +43,7 @@ export function remainingDrafts(
   return previous.sets.slice(done).map(toDraft)
 }
 
-/** Values for an extra set added by hand: repeat today's last set, else last time's first, else blank. */
+/** Next set: today's last set, else last time's first, else blank. */
 export function nextDraft(
   previous: PreviousPerformance | null,
   loggedToday: readonly LoggedSet[],

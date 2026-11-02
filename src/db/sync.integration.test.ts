@@ -19,16 +19,14 @@ import {
   togglePlanDay,
   updatePlanSession,
 } from '../features/plans/data'
+import { applyFix } from '../features/plans/rating'
 import { toggleDraftDay, type DraftItem } from '../lib/plans/draft'
 import { db } from './local'
 import { supabase } from './supabase'
 import { clearLocalData, pull, push } from './sync'
 import { setCurrentUserId } from './user'
 
-/**
- * End-to-end: log a workout "offline" into IndexedDB, push it through RLS to the local Supabase,
- * wipe the device, pull it back. Requires `supabase start` and VITE_SUPABASE_* in the environment.
- */
+/** Log offline, upload, wipe, download again. Needs `supabase start`. */
 describe('offline log → push → wipe → pull', () => {
   beforeAll(async () => {
     const email = `it-${Date.now()}@test.local`
@@ -229,6 +227,46 @@ describe('plans round-trip', () => {
     expect((await db.plans.get(a))?.is_active).toBe(false)
     expect((await db.plans.get(b))?.is_active).toBe(true)
     await push() // the server's one-active-plan rule accepts the order of writes
+    expect(await db.outbox.count()).toBe(0)
+  })
+
+  it('applies the spacing fixes: move a day, and regroup exercises between workouts', async () => {
+    let draft: DraftItem[] = []
+    draft = toggleDraftDay(draft, { kind: 'preset', templateId: 'push', version: 'A' }, 1).draft
+    draft = toggleDraftDay(draft, { kind: 'preset', templateId: 'pull', version: 'A' }, 2).draft
+    const planId = await savePlanFromDraft('Spacing', draft, false)
+    const rows = (await loadPlanRows(planId))!
+    const [pushW, pullW] = rows.sessions
+    const pulldown = rows.exercises.find((e) => e.plan_session_id === pullW!.id)!
+
+    await applyFix(planId, {
+      kind: 'move',
+      id: 'm',
+      text: '',
+      workoutId: pullW!.id,
+      fromDay: 2,
+      toDay: 4,
+    })
+    await applyFix(planId, {
+      kind: 'regroup',
+      id: 'r',
+      text: '',
+      moves: [{ planExerciseId: pulldown.id, toWorkoutId: pushW!.id }],
+    })
+
+    const after = (await loadPlanRows(planId))!
+    expect(
+      after.schedule.filter((d) => d.plan_session_id === pullW!.id).map((d) => d.weekday),
+    ).toEqual([4])
+    const moved = after.exercises.find((e) => e.id === pulldown.id)!
+    expect(moved.plan_session_id).toBe(pushW!.id)
+    // Goes to the end of its new workout
+    expect(moved.order).toBe(
+      Math.max(
+        ...after.exercises.filter((e) => e.plan_session_id === pushW!.id).map((e) => e.order),
+      ),
+    )
+    await push()
     expect(await db.outbox.count()).toBe(0)
   })
 

@@ -6,10 +6,7 @@ export interface RawData {
   rows: (string | number)[][]
 }
 
-/**
- * A chart with its title, an optional date-range filter, and a "View raw" toggle that swaps the
- * chart for the exact numbers behind it.
- */
+/** Chart card with a title, optional date range and a "View raw" table toggle. */
 export function ChartCard({
   title,
   subtitle,

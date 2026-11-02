@@ -1,13 +1,29 @@
-/**
- * The knowledge behind plan ratings: sensible weekly set ranges per muscle, which muscles belong
- * together, and which exercise to suggest when something's missing. Names must match the seeded
- * catalogue (checked by tests).
+/** Set ranges, muscle groupings and exercise suggestions used by the rating. */
+
+/*
+ * Sources:
+ * - Weekly sets drive growth most (Schoenfeld 2017; Pelland 2024).
+ * - Extra sets for one muscle in one session add less and less (Pelland 2024).
+ * - Muscles take ~48–72 h to recover from hard training (MacDougall 1995; Damas 2015).
  */
 
-/**
- * Weekly working sets (secondary movers count half). Used when the user hasn't set their own
- * range (every muscle starts at the generic 10–20). A min of 0 means "nice to have".
- */
+/** A session the day after another for the same muscle counts as this much. */
+export const BACK_TO_BACK_CREDIT = 0.5
+
+/** Sets per muscle per session before extra sets count half. */
+export const PER_SESSION_MAX = 10
+
+/** Used to split workouts into a push day and a pull day. */
+export const PUSH_MUSCLES: readonly string[] = ['chest', 'front_delts', 'side_delts', 'triceps']
+export const PULL_MUSCLES: readonly string[] = [
+  'lats',
+  'upper_back',
+  'rear_delts',
+  'biceps',
+  'forearms',
+]
+
+/** Default weekly set ranges. A min of 0 means optional. */
 export const DEFAULT_RANGES: Readonly<Record<string, readonly [number, number]>> = {
   chest: [10, 20],
   front_delts: [4, 12],

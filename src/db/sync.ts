@@ -3,10 +3,8 @@ import { supabase } from './supabase'
 import { localKey, withLocalKey } from './write'
 
 /**
- * Two-way sync between IndexedDB and Supabase.
- * - push(): drains the outbox strictly in order with idempotent upserts (client-generated IDs).
- * - pull(): fetches rows changed since a per-table cursor (server-owned updated_at). Rows with
- *   un-pushed local edits are skipped, so local changes win until they've been uploaded.
+ * push(): uploads queued changes in order.
+ * pull(): downloads changed rows, skipping ones with local changes not yet uploaded.
  */
 
 const CONFLICT_KEYS: Partial<Record<SyncedTable, string>> = {

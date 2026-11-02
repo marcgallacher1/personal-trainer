@@ -1,5 +1,4 @@
-// Generates the reference-data migration (muscles + seeded exercise catalogue) from src/lib/seed.
-// Reference data lives in a migration (not seed.sql) so `supabase db push` ships it to the hosted DB.
+// Builds the muscles + exercises migration from src/lib/seed (a migration so it reaches the hosted DB).
 // Usage: node scripts/gen-reference-sql.ts
 import { writeFileSync } from 'node:fs'
 import { EXERCISES } from '../src/lib/seed/exercises.ts'
@@ -38,8 +37,7 @@ const lines: string[] = [
 writeFileSync(OUT, lines.join('\n'))
 console.log(`Wrote ${OUT}: ${MUSCLES.length} muscles, ${EXERCISES.length} exercises`)
 
-// Logging types arrived after the reference data shipped, so they live in their own migration
-// (a new column + per-exercise values). Regenerated from the same catalogue.
+// Log types were added later, so they get their own migration.
 const LOG_TYPES_OUT = 'supabase/migrations/20261030040000_exercise_log_types.sql'
 const special = EXERCISES.filter((e) => e.logType !== 'weight_reps')
 const logTypeLines = [

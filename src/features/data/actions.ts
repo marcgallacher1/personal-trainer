@@ -103,10 +103,7 @@ export async function exportEverything(): Promise<string> {
   )
 }
 
-/**
- * Saves a file: the share sheet on iPhone (so it can go to Files, Mail, etc.), a normal
- * download elsewhere.
- */
+/** Saves a file via the share sheet on iPhone, or a download elsewhere. */
 export async function saveFile(name: string, type: string, text: string): Promise<void> {
   const file = new File([text], name, { type })
   if (navigator.canShare?.({ files: [file] })) {

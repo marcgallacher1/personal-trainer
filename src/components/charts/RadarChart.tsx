@@ -1,7 +1,4 @@
-/**
- * A spider chart comparing two series (e.g. planned vs actual sets per muscle group). Values are
- * scaled to the largest on any axis.
- */
+/** Spider chart comparing series, scaled to the largest value. */
 export function RadarChart({
   axes,
   series,

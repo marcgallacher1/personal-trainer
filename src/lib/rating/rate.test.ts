@@ -8,6 +8,7 @@ import {
   planVsActual,
   rangeFor,
   ratePlan,
+  type Fix,
   type MuscleGoal,
   type Rating,
   type RatingExercise,
@@ -255,7 +256,9 @@ describe('ratePlan', () => {
   it('notices the same muscle hammered on back-to-back days (incl. Sunday → Monday)', () => {
     const spaced = ratePlan(input([chestDay('a', 1), chestDay('b', 4)]))
     const backToBack = ratePlan(input([chestDay('a', 7), chestDay('b', 1)]))
-    expect(backToBack.lacking.some((l) => l.text.includes('back-to-back'))).toBe(true)
+    expect(
+      backToBack.lacking.some((l) => /trained hard on Sun and again on Mon/.test(l.text)),
+    ).toBe(true)
     expect(subscore(backToBack, 'recovery')).toBeLessThan(subscore(spaced, 'recovery'))
   })
 
@@ -271,6 +274,104 @@ describe('ratePlan', () => {
     const r = ratePlan(input([]))
     expect(r.score).toBe(0)
     expect(r.strengths).toEqual([])
+  })
+})
+
+/** Two big upper-body workouts: Push A + Pull A, and Push B + Pull B */
+const big = (id: string, version: string, day: number): RatingWorkout => ({
+  id,
+  name: id,
+  timesPerWeek: 1,
+  days: [day],
+  exercises: [
+    ...preset('push', version, [day]).exercises,
+    ...preset('pull', version, [day]).exercises,
+  ],
+})
+const monTue = [big('Big A', 'A', 1), big('Big B', 'B', 2)]
+const monThu = [big('Big A', 'A', 1), big('Big B', 'B', 4)]
+
+/** Applies a regroup fix to plan workouts (what the app does to the plan rows). */
+function applyRegroup(ws: RatingWorkout[], fix: Fix): RatingWorkout[] {
+  if (fix.kind !== 'regroup') throw new Error('not a regroup')
+  const all = ws.flatMap((w) => w.exercises)
+  const dest = new Map(fix.moves.map((m) => [m.planExerciseId, m.toWorkoutId]))
+  return ws.map((w) => ({
+    ...w,
+    exercises: all.filter(
+      (pe) => (dest.get(pe.id) ?? ws.find((x) => x.exercises.includes(pe))!.id) === w.id,
+    ),
+  }))
+}
+
+describe('spacing and recovery', () => {
+  it('marks down cramming the same muscles into Mon and Tue, then resting', () => {
+    const crammed = ratePlan(input(monTue))
+    const spread = ratePlan(input(monThu))
+    expect(crammed.score).toBeLessThan(spread.score - 10)
+    expect(subscore(crammed, 'recovery')).toBeLessThan(20)
+    // Mon + Tue counts as 1.5 sessions a week, not 2
+    expect(crammed.muscles.find((m) => m.id === 'chest')!.frequency).toBe(1.5)
+    expect(spread.muscles.find((m) => m.id === 'chest')!.frequency).toBe(2)
+    // It's the first thing to fix, and says why
+    expect(crammed.lacking[0]!.text).toMatch(
+      /^Chest, .*: trained hard on Mon and again on Tue, then 5 days off/,
+    )
+    expect(crammed.lacking[0]!.text).toMatch(/48–72 hours/)
+  })
+
+  it('offers to split the two days into push and pull, or to move a day', () => {
+    const point = ratePlan(input(monTue)).lacking[0]!
+    expect(point.fix?.kind).toBe('regroup')
+    expect(point.fix?.text).toMatch(/push workout .* pull workout/)
+    expect(point.alternative).toMatchObject({
+      kind: 'move',
+      workoutId: 'Big B',
+      fromDay: 2,
+      toDay: 4,
+    })
+
+    // After the regroup, each day trains different muscles and recovery recovers
+    const regrouped = ratePlan(input(applyRegroup(monTue, point.fix!)))
+    expect(subscore(regrouped, 'recovery')).toBeGreaterThan(
+      subscore(ratePlan(input(monTue)), 'recovery') + 40,
+    )
+    expect(regrouped.score).toBeGreaterThan(ratePlan(input(monTue)).score)
+  })
+
+  it('only offers a move when both days are already the same kind of workout', () => {
+    const point = ratePlan(
+      input([preset('push', 'A', [1]), { ...preset('push', 'B', [2]), id: 'pushB' }]),
+    ).lacking.find((l) => l.text.includes('trained hard on Mon and again on Tue'))!
+    expect(point.fix?.kind).toBe('move')
+    expect(point.alternative).toBeUndefined()
+  })
+
+  it('flags too many sets for one muscle in one session', () => {
+    const r = ratePlan(input([one('w', 'Machine Chest Press', 12, [1, 4])]))
+    const chest = r.overdone.find((o) => o.muscleId === 'chest' && o.text.includes('sets in'))
+    expect(chest?.text).toMatch(/^Chest: 12 sets in w\. Past about 10 hard sets/)
+    // Sets past 10 count half
+    expect(subscore(r, 'volume')).toBeLessThan(
+      subscore(ratePlan(input([one('w', 'Machine Chest Press', 10, [1, 4])])), 'volume') + 1,
+    )
+  })
+
+  it('spots back-to-back days in logged training too', () => {
+    const { workouts, weeks } = loggedWorkouts(
+      [
+        { id: 'a', name: 'Mon', date: '2026-10-26' },
+        { id: 'b', name: 'Tue', date: '2026-10-27' },
+      ],
+      [...Array.from({ length: 5 }, () => set('a')), ...Array.from({ length: 5 }, () => set('b'))],
+      '2026-11-01',
+      1,
+    )
+    const r = ratePlan(input(workouts, { mode: 'actual', weeks }))
+    expect(
+      r.lacking.some((l) => l.text.startsWith('Chest') && l.text.includes('back-to-back')),
+    ).toBe(true)
+    expect(r.lacking.every((l) => !l.fix)).toBe(true)
   })
 })
 

@@ -9,7 +9,7 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState>({ session: null, loading: true })
 
-/** If the auth check stalls (e.g. offline with an expired token), carry on with the saved session. */
+/** If the auth check stalls (e.g. offline), use the saved session. */
 const GET_SESSION_TIMEOUT_MS = 5000
 
 function storedSession(): Session | null {

@@ -323,10 +323,7 @@ const CORE: Row[] = [
   ['Dragon Flag', 'bodyweight', 'core', ['abs'], ['obliques']],
 ]
 
-/**
- * Logging type exceptions. Everything else: bodyweight equipment → bodyweight × reps
- * (with optional added weight), all other equipment → weight × reps.
- */
+/** Log type exceptions. Otherwise bodyweight kit → bodyweight × reps, else weight × reps. */
 const LOG_TYPE_OVERRIDES: Record<string, LogType> = {
   // Timed holds
   Plank: 'duration',

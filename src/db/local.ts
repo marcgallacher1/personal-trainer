@@ -1,10 +1,7 @@
 import { Dexie, type EntityTable } from 'dexie'
 import type { Tables } from './database.types'
 
-/**
- * Local-first store. The UI reads and writes here; the sync worker mirrors it to Supabase.
- * Table names match Postgres so sync code can stay generic.
- */
+/** On-device database. The UI uses this; sync copies it to Supabase. Table names match Postgres. */
 
 /** Tables the client writes and pushes via the outbox. */
 export const SYNCED_TABLES = [

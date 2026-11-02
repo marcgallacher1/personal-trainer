@@ -58,10 +58,7 @@ const customSource = (c: CustomCard): WorkoutSource => ({
   exercises: c.exercises,
 })
 
-/**
- * Build a plan: pick a workout type → pick a workout → tap the day(s) it's on. Repeat, then save.
- * /plans/new builds a new plan (kept as a draft until saved); /plans/:planId/add adds to an existing one.
- */
+/** Pick a workout, tap its day(s), repeat, save. Also adds to an existing plan. */
 export function PlanBuilderScreen() {
   const { planId } = useParams()
   const navigate = useNavigate()
@@ -172,7 +169,7 @@ export function PlanBuilderScreen() {
   }
 
   const hasActive = (allPlans ?? []).some((p) => p.is_active)
-  // "Push A added to plan (Fri)" covers the Save/Done button for its second, rather than floating over it
+  // Briefly shown in place of the Save button
   const inlineToast = useInlineToast()
 
   return (

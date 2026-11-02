@@ -14,6 +14,7 @@ interface PlanLike {
     plan_session_id: string
     exercise_id: string
     order: number
+    group_id?: string | null
     deleted_at: string | null
   }[]
   targets: readonly (TargetLike & {
@@ -46,6 +47,7 @@ export function planWorkouts(plan: PlanLike): RatingWorkout[] {
           .map((e) => ({
             id: e.id,
             exerciseId: e.exercise_id,
+            groupId: e.group_id ?? null,
             sets: plan.targets
               .filter((t) => !t.deleted_at && t.plan_exercise_id === e.id)
               .toSorted((a, b) => a.order - b.order),
@@ -71,10 +73,7 @@ export interface LoggedSession {
 
 const dayNumber = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000)
 
-/**
- * The last `maxWeeks` weeks of logged workouts, each counted as a fraction of a week. If you've
- * only been logging for a shorter time, it's averaged over that instead.
- */
+/** Logged workouts from the last few weeks, averaged per week. */
 export function loggedWorkouts(
   sessions: readonly LoggedSession[],
   sets: readonly LoggedSet[],

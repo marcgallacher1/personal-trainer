@@ -1,8 +1,4 @@
-/**
- * "How closely am I following my plan?" Logged workouts are matched against the plan's workouts,
- * and exercises don't need to be exact: a fair swap (same movement, same main muscles — e.g.
- * Lat Pulldown ↔ Pull-Up) gets full credit, a related one partial credit.
- */
+/** How closely you follow your plan. Fair swaps (e.g. pull-up for pulldown) count in full. */
 import {
   addDays,
   setsByExercise,
@@ -71,7 +67,7 @@ export interface WorkoutMatch {
   extras: string[]
 }
 
-/** Matches one logged workout against one planned workout, pairing each planned exercise with its best stand-in. */
+/** Matches a logged workout to a planned one, exercise by exercise. */
 export function matchWorkout(
   planned: PlannedWorkout,
   done: readonly { exerciseId: string; sets: number }[],
@@ -143,11 +139,7 @@ export interface WeekAdherence {
 /** A logged workout counts towards a plan workout if it matches it at least this well. */
 const MIN_MATCH = 0.3
 
-/**
- * Week-by-week adherence. Each week has a slot per planned workout (Push A on Mon and Thu = two
- * slots); logged workouts fill the slots they match best, so doing Push A twice instead of
- * Push A + Push B still mostly counts.
- */
+/** Adherence per week: each logged workout fills the planned slot it matches best. */
 export function weeklyAdherence(
   plan: readonly PlannedWorkout[],
   sessions: readonly TrainingSession[],
@@ -216,10 +208,7 @@ export interface AdherenceSummary {
   longestStreak: number
 }
 
-/**
- * Streaks count weeks where you did at least as many workouts as planned. The current week
- * counts once it's hit; until then the streak carries on from last week.
- */
+/** A streak week = all planned workouts done. This week counts once it's hit. */
 export function summariseAdherence(
   weeks: readonly WeekAdherence[],
   today: string,

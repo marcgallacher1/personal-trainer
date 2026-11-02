@@ -15,10 +15,7 @@ export interface Bar {
   values: Record<string, number>
 }
 
-/**
- * Bars (stacked when there are several series): rounded tops anchored to the baseline, 2px gaps
- * between segments, an optional dashed target line, and a tap tooltip per bar.
- */
+/** Bar chart (stacked for several series) with an optional target line and tap tooltips. */
 export function BarChart({
   bars,
   series,

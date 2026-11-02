@@ -37,10 +37,7 @@ async function exerciseInfo(): Promise<Map<string, ExerciseInfo>> {
   )
 }
 
-/**
- * Adds ~12 weeks of realistic workouts following the active plan (or Push/Pull A and B on
- * Mon/Tue/Thu/Fri if no plan is on). Returns how many workouts were added.
- */
+/** Adds ~12 weeks of fake workouts that follow the active plan. Returns how many. */
 export async function loadSampleWorkouts(): Promise<number> {
   const info = await exerciseInfo()
   const active = (await db.plans.toArray()).find((p) => live(p) && p.is_active)

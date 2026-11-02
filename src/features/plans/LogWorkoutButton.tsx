@@ -9,11 +9,7 @@ import { startSession } from '../log/actions'
 import { londonDate } from '../log/format'
 import { startFromPlan, usePlanLibrary } from './data'
 
-/**
- * The one "Log workout" button. With an active plan it offers today's planned workout first, the
- * plan's other workouts, and a custom workout. Without an active plan it goes straight to a
- * custom workout — plans are optional.
- */
+/** "Log workout": offers the active plan's workouts (today's first), or starts a blank one. */
 export function LogWorkoutButton() {
   const navigate = useNavigate()
   const library = usePlanLibrary()

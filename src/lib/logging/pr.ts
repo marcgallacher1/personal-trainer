@@ -18,13 +18,8 @@ export type PR =
 const effort = (s: SetPoint, t: LogType) => (isTimed(t) ? (s.duration_seconds ?? 0) : s.reps)
 
 /**
- * PBs a set beats, compared with every earlier set of the same exercise.
- * The first time you do an exercise isn't treated as a PB. Warm-ups never count. Most notable first.
- *
- * - e1RM only applies to weight × reps.
- * - "Heaviest ever" applies when weight is the load (weight × reps, weight × time).
- * - Otherwise a set is a PB when no earlier set matched or beat it on both load and effort.
- *   For assisted movements, LESS assistance is the harder load.
+ * PBs this set beats vs all earlier sets. Never on the first go; warm-ups don't count.
+ * For assisted exercises, less assistance is harder.
  */
 export function detectPRs(
   candidate: SetPoint,

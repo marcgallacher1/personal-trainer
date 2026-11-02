@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import type { MuscleVolume } from '../../lib/rating/rate'
 
-/**
- * Front and back body figures with each muscle coloured by its weekly sets: amber when short,
- * teal in range, red when over, grey when paused. Tap a muscle for its numbers.
- */
+/** Front and back body, each muscle coloured by weekly sets vs its target. */
 
 /** One shape on the left half of a figure (mirrored for the right). */
 interface Shape {

@@ -18,7 +18,7 @@ const emit = () => listeners.forEach((l) => l())
 export function showToast(t: Omit<ToastData, 'id' | 'tone'> & { tone?: ToastData['tone'] }): void {
   current = { tone: 'default', ...t, id: ++seq }
   clearTimeout(timer)
-  // Undo toasts stay long enough to tap; PB celebrations linger a bit; plain confirmations are quick.
+  // Undo: 5 s, PB: 3.5 s, plain: 1 s
   timer = setTimeout(dismiss, t.action ? 5000 : t.tone === 'celebrate' ? 3500 : 1000)
   emit()
 }

@@ -16,10 +16,7 @@ export interface CustomExercise {
   targets: TargetLike[]
 }
 
-/**
- * Where a workout in a plan came from: a preset (e.g. Push A) or the user's own, optionally made
- * under a workout type (e.g. "Custom Push") with the exercises they picked.
- */
+/** Where a plan workout came from: a preset, or your own with picked exercises. */
 export type WorkoutSource =
   | { kind: 'preset'; templateId: string; version: string }
   | { kind: 'custom'; name: string; templateId?: string; exercises?: CustomExercise[] }
@@ -72,10 +69,7 @@ export function titleFor(s: WorkoutSource): string {
   return t ? versionTitle(t.name, s.version) : s.version
 }
 
-/**
- * Tap a day for a workout: adds the workout (if new) on that day, or removes the day if it was
- * already chosen. A workout left with no days drops out of the draft.
- */
+/** Toggles a workout's day. A workout with no days left is removed. */
 export function toggleDraftDay(
   draft: readonly DraftItem[],
   source: WorkoutSource,

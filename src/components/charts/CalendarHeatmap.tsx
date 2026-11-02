@@ -6,10 +6,7 @@ import { shortDate } from './scales'
 const SHADE = [0, 0.3, 0.5, 0.72, 1]
 const ROWS = ['M', '', 'W', '', 'F', '', 'S']
 
-/**
- * One square per day, a column per week (Monday at the top), shaded by working sets. Tap a day
- * to see what you did.
- */
+/** One square per day, one column per week, shaded by working sets. */
 export function CalendarHeatmap({
   setsByDay,
   from,

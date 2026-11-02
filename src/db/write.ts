@@ -30,10 +30,7 @@ export interface Change {
   row: Row
 }
 
-/**
- * Write rows locally and queue them for upload in ONE IndexedDB transaction,
- * so a logged set can never exist locally without also being queued (or vice versa).
- */
+/** Saves rows and queues them for upload in one go, so nothing is saved but not queued. */
 export async function save(changes: Change[]): Promise<void> {
   if (changes.length === 0) return
   const tables = [...new Set(changes.map((c) => c.table))].map((t) => db.table(t))

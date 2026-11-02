@@ -4,11 +4,7 @@ import { Button } from '../../components/Button'
 
 type Mode = 'sign-in' | 'create'
 
-/**
- * Email + password sign-in. Email links/codes aren't usable: on iOS a link opens in Safari (separate
- * storage from the home-screen app), and Supabase's free tier can't customise emails to send codes.
- * Sessions persist, so this is a one-off per device.
- */
+/** Email + password sign-in (email links would open in Safari, not the home-screen app). */
 export function SignInScreen() {
   const [mode, setMode] = useState<Mode>('sign-in')
   const [email, setEmail] = useState('')

@@ -1,8 +1,4 @@
-/**
- * Plausible fake training history, for development and tests: follows a plan most weeks, with
- * the odd missed or moved day, fair exercise swaps, steady progress, and one lift that stalls.
- * Deterministic for a given seed.
- */
+/** Fake but realistic training history for tests and demos. Same seed, same result. */
 import { swapCredit } from '../analysis/adherence'
 import { addDays, weekOf, type ExerciseInfo } from '../analysis/training'
 import { isTimed } from '../logging/types'

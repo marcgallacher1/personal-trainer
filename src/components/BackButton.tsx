@@ -8,10 +8,7 @@ interface Props {
   onBack?: () => void | Promise<void>
 }
 
-/**
- * Top-left back link. Home-screen apps have no browser back button, so every screen gets one.
- * Goes to the previous screen when there is one, otherwise to `fallback`.
- */
+/** Back link (home-screen apps have no browser back). Uses `fallback` if there's no history. */
 export function BackButton({ fallback, label = 'Back', onBack }: Props) {
   const navigate = useNavigate()
   return (
