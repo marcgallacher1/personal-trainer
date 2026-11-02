@@ -71,3 +71,16 @@ self.addEventListener('notificationclick', (event) => {
     })(),
   )
 })
+
+// The browser replaced the subscription: re-subscribe now; the app sends it to the server when opened.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  const e = event as Event & {
+    oldSubscription?: PushSubscription | null
+    waitUntil: (p: Promise<unknown>) => void
+  }
+  const key = e.oldSubscription?.options.applicationServerKey
+  if (!key) return
+  e.waitUntil(
+    self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }),
+  )
+})

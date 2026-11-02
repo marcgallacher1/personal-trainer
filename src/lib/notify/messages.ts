@@ -1,0 +1,133 @@
+/** Message copy for notifications: varied, by tone, sometimes counting down to your goal date. */
+import type { NotifyType, Tone } from './rules'
+
+type Pool = Record<'chill' | 'motivational' | 'drill', string[]>
+
+/** {workout}, {goal}, {days}, {grams}, {pb} and {weeks} are filled in. */
+export const POOLS: Partial<Record<NotifyType | 'gym_followup' | 'bodyweight_followup', Pool>> = {
+  gym: {
+    chill: [
+      '{workout} is on today. Head over when you’re ready 👋',
+      'Gym later? {workout} is waiting for you.',
+      'Gentle nudge: {workout} today.',
+    ],
+    motivational: [
+      '{workout} today. Let’s make it a good one 💪',
+      'Every session counts. {workout} is up.',
+      'Future you will thank you. {workout} today.',
+      'You’ve built the plan, now run it. {workout} time.',
+      'Show up, do the work. {workout} today.',
+    ],
+    drill: [
+      '{workout}. Today. No excuses.',
+      'Bag packed? Move. {workout} won’t do itself.',
+      'Stop scrolling. {workout}. Go.',
+      'Excuses don’t build muscle. {workout} today.',
+      'You said you’d train. {workout}. Now.',
+    ],
+  },
+  gym_followup: {
+    chill: [
+      'Been to the gym yet? If you’re done, log it. If not, there’s still time.',
+      'Still on for {workout}? Log it if you’ve been.',
+    ],
+    motivational: [
+      'Either log {workout} or get it done. You’ve got this.',
+      'Nothing logged yet. Smashed it already? Log it. If not, go now.',
+      'Still time for {workout}. Make today count.',
+    ],
+    drill: [
+      'Nothing logged. In the gym? Log it. On the sofa? Get up.',
+      '{workout} still missing. Log it or go. Your call, no excuses.',
+      'Clock’s ticking. Log {workout} or get moving.',
+    ],
+  },
+  log_session: {
+    chill: ['Still training? Save {workout} when you’re done.'],
+    motivational: [
+      'Great work today. Save {workout} so it counts.',
+      'Don’t lose today’s numbers. Save {workout}.',
+    ],
+    drill: [
+      'Workout still open. Finish it and save {workout}.',
+      'Save {workout}. Every set counts.',
+    ],
+  },
+  missed_workout: {
+    chill: ['No {workout} today, that’s ok. {reschedule}'],
+    motivational: [
+      'Not started {workout} yet. {reschedule}',
+      'Missed {workout}? One day doesn’t break you. {reschedule}',
+    ],
+    drill: [
+      '{workout} hasn’t happened. {reschedule}',
+      'Skipped {workout}? Make it up. {reschedule}',
+    ],
+  },
+  protein: {
+    chill: ['Protein check: {grams}', 'How’s protein going? {grams}'],
+    motivational: ['Feed the gains. {grams}', 'Muscle is built in the kitchen too. {grams}'],
+    drill: ['Protein. Now. {grams}', 'Hit your protein. {grams}'],
+  },
+  bodyweight: {
+    chill: ['Morning weigh-in when you’re up.'],
+    motivational: ['Weekly weigh-in: step on, log it, track the trend.'],
+    drill: ['Scales. Now. Before breakfast.'],
+  },
+  bodyweight_followup: {
+    chill: ['No weigh-in logged today. Quick one tomorrow morning?'],
+    motivational: ['Forgot the weigh-in? Log it so the trend stays accurate.'],
+    drill: ['Weigh-in still missing. Sort it.'],
+  },
+}
+
+/** Countdown lines mixed into reminders when a goal date is set. */
+export const GOAL_LINES: Record<'chill' | 'motivational' | 'drill', string[]> = {
+  chill: ['{days} days to {goal}.', '{goal} is {days} days away.'],
+  motivational: [
+    '{days} days to {goal}. Make them count.',
+    '{goal} in {days} days. Every session gets you closer.',
+    '{days} days until {goal}. Build the body you want there.',
+  ],
+  drill: [
+    '{days} days to {goal}. Lock in.',
+    '{goal} in {days} days. No days off from the plan.',
+    '{days} days left before {goal}. Earn it.',
+  ],
+}
+
+/** Small stable hash, so the same notification always picks the same line. */
+export function hash(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return h >>> 0
+}
+
+const toneFor = (tone: Tone, seed: number): 'chill' | 'motivational' | 'drill' =>
+  tone === 'mix' ? (seed % 2 ? 'drill' : 'motivational') : tone
+
+const fill = (s: string, vars: Record<string, string | number>) =>
+  s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m))
+
+export interface CopyInput {
+  pool: keyof typeof POOLS
+  tone: Tone
+  /** Seeds the choice (use the notification's idempotency key) */
+  key: string
+  vars: Record<string, string | number>
+  custom?: readonly string[]
+  /** Days to the goal date, if one is set and still ahead */
+  goal?: { name: string; days: number } | null
+}
+
+/** Picks a line for a notification. About half get a goal countdown added when there is one. */
+export function pickMessage(c: CopyInput): string {
+  const seed = hash(c.key)
+  const tone = toneFor(c.tone, seed >>> 3)
+  const lines = [...(POOLS[c.pool]?.[tone] ?? []), ...(c.custom ?? [])]
+  const line = fill(lines[seed % lines.length] ?? '', c.vars)
+  if (!c.goal || c.goal.days <= 0 || (seed >>> 7) % 2 === 1) return line
+  const goals = GOAL_LINES[tone]
+  const extra = fill(goals[(seed >>> 9) % goals.length]!, { goal: c.goal.name, days: c.goal.days })
+  return `${line} ${extra}`
+}

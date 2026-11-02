@@ -54,7 +54,21 @@ export function MoreScreen() {
           <span className="text-2xl text-muted">›</span>
         </Link>
 
-        <ComingSoon phase="Phases 4–8">Reports and Settings will live here.</ComingSoon>
+        <Link
+          to="/settings"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <span className="text-2xl">🔔</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-bold">Settings</span>
+            <span className="block text-sm text-muted">
+              Notifications, quiet hours, pause and your goal date
+            </span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+
+        <ComingSoon phase="Phases 6–8">Weekly reports will live here.</ComingSoon>
 
         <SampleData />
 

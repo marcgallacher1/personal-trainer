@@ -22,6 +22,9 @@ import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
 import { RatingScreen } from '../features/plans/RatingScreen'
 import { DataScreen } from '../features/data/DataScreen'
+import { refreshPush } from '../features/settings/push'
+import { SettingsScreen } from '../features/settings/SettingsScreen'
+import { SetupWizard } from '../features/settings/SetupWizard'
 import { MuscleScreen } from '../features/progress/MuscleScreen'
 import { PlanFollowScreen } from '../features/progress/PlanFollowScreen'
 import { ProgressScreen } from '../features/progress/ProgressScreen'
@@ -54,6 +57,8 @@ const router = createBrowserRouter([
       { path: '/plans/:planId/rating', element: <RatingScreen /> },
       { path: '/goals', element: <GoalsScreen /> },
       { path: '/more', element: <MoreScreen /> },
+      { path: '/settings', element: <SettingsScreen /> },
+      { path: '/settings/setup', element: <SetupWizard /> },
       { path: '*', element: <TodayScreen /> },
     ],
   },
@@ -104,6 +109,7 @@ function SignedIn({ userId }: { userId: string }) {
       .then(() => {
         setReady(true)
         stop = startSyncLoop()
+        void refreshPush()
       })
       .catch((e: unknown) =>
         setError(

@@ -14,3 +14,13 @@ export function londonToIso(date: string, time: string): string {
   const offsetMin = ((lh * 60 + lm - (h! * 60 + mi!) + 1440 + 720) % 1440) - 720
   return new Date(guess - offsetMin * 60_000).toISOString()
 }
+
+/** ISO week of a YYYY-MM-DD date, e.g. '2026-W45'. */
+export function isoWeek(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  // Thursday of this week decides the year
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1)
+  const week = Math.ceil(((d.getTime() - yearStart) / 86_400_000 + 1) / 7)
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+}

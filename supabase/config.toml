@@ -425,3 +425,7 @@ max_frequency = "1m0s"
 [remotes.production.auth.mfa.totp]
 enroll_enabled = true
 verify_enabled = true
+
+# The cron job authenticates with NOTIFY_SECRET instead of a user JWT.
+[functions.notify]
+verify_jwt = false

@@ -93,3 +93,13 @@ Home-screen apps have no browser back button, so every screen has a top-left **B
 the previous screen, or to a sensible parent when the app was opened directly on that screen.
 Leaving a workout with nothing logged cancels it, so a mis-tap never leaves an empty workout
 behind.
+
+## Notifications
+
+The phone never schedules anything. `pg_cron` calls the `notify` Edge Function every 5 minutes.
+It loads each subscribed user's rules, plan, today's workouts and what's already been sent, then
+asks `dueNotifications()` (in `src/lib/notify`, pure and tested) what's due. Times are London
+wall-clock times, so clock changes are handled. Quiet hours and pauses log a reminder as
+"skipped" instead of sending it. The unique `(user_id, idempotency_key)` on `notification_log` is
+the final guard against duplicates. Dead subscriptions (404/410) are removed, and the app
+re-sends its subscription each time it starts.

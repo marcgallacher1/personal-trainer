@@ -16,6 +16,7 @@
     "icons": "pwa-assets-generator",
     "check": "npm run typecheck && npm run lint && npm test",
     "gen:seed": "node scripts/gen-reference-sql.ts",
+    "gen:shared": "node scripts/gen-shared.ts",
     "db:reset": "supabase db reset",
     "gen:types": "supabase gen types typescript --local > src/db/database.types.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts"

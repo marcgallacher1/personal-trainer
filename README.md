@@ -36,15 +36,16 @@ Supabase Studio is at <http://127.0.0.1:54323>.
 
 ### Useful scripts
 
-| Script              | What it does                                                     |
-| ------------------- | ---------------------------------------------------------------- |
-| `npm run check`     | Typecheck, lint and unit tests                                   |
-| `npm test`          | Vitest (pure logic in `src/lib`)                                 |
-| `supabase test db`  | pgTAP database tests (RLS) in `supabase/tests`                   |
-| `npm run db:reset`  | Rebuild the local DB from migrations and the seed                |
-| `npm run gen:types` | Regenerate `src/db/database.types.ts` from the local schema      |
-| `npm run gen:seed`  | Regenerate the reference-data migration from `src/lib/seed/*.ts` |
-| `npm run icons`     | Regenerate the PWA icons from `public/logo.svg`                  |
+| Script               | What it does                                                     |
+| -------------------- | ---------------------------------------------------------------- |
+| `npm run check`      | Typecheck, lint and unit tests                                   |
+| `npm test`           | Vitest (pure logic in `src/lib`)                                 |
+| `supabase test db`   | pgTAP database tests (RLS) in `supabase/tests`                   |
+| `npm run db:reset`   | Rebuild the local DB from migrations and the seed                |
+| `npm run gen:types`  | Regenerate `src/db/database.types.ts` from the local schema      |
+| `npm run gen:seed`   | Regenerate the reference-data migration from `src/lib/seed/*.ts` |
+| `npm run gen:shared` | Copy the notification logic into the Edge Functions              |
+| `npm run icons`      | Regenerate the PWA icons from `public/logo.svg`                  |
 
 ### Changing the exercise catalogue
 
@@ -96,11 +97,37 @@ stale.
 4. The first time, tap **Create an account** and choose a password. iCloud Keychain can save it. After
    that you stay signed in.
 
-Push notifications (Phase 4) need iOS 16.4 or later and only work in the Home Screen app.
+Push notifications need iOS 16.4 or later and only work in the Home Screen app.
 
-## Web Push / VAPID keys
+## Notifications (Web Push)
 
-_Phase 4._ Generating the keys, setting `supabase secrets` and setting up `pg_cron` will be documented here.
+Reminders are decided and sent by the server, so they arrive with the app closed. Every 5 minutes
+`pg_cron` calls the `notify` Edge Function. It checks your rules (Settings → Notifications) and
+sends what's due. Each reminder has a key in `notification_log`, so it's never sent twice.
+
+**Setting it up on the hosted project (once):**
+
+1. Make a key pair: `npx web-push generate-vapid-keys`. Put the **public** key in
+   `PROD_VAPID` in `src/features/settings/push.ts` (it's safe to ship). Keep the private key secret.
+2. Set the function secrets:
+   ```bash
+   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...      VAPID_SUBJECT=https://<your-app>.vercel.app NOTIFY_SECRET=<long random string>
+   ```
+3. Deploy: `supabase db push`, then `supabase functions deploy notify --no-verify-jwt` and
+   `supabase functions deploy test-push`.
+4. Point the cron job at the function by calling `configure_notify` with the service role key:
+   ```bash
+   curl -X POST "https://<ref>.supabase.co/rest/v1/rpc/configure_notify"      -H "apikey: <service role key>" -H "Authorization: Bearer <service role key>"      -H "Content-Type: application/json"      -d '{"url": "https://<ref>.supabase.co/functions/v1/notify", "secret": "<NOTIFY_SECRET>"}'
+   ```
+5. On the iPhone (from the Home Screen app): More → Settings → Enable notifications → Send test.
+
+**Locally:** put the same four values in `supabase/functions/.env` (git-ignored) and the public key
+in `VITE_VAPID_PUBLIC_KEY` in `.env.local`, then
+`supabase functions serve --env-file supabase/functions/.env --no-verify-jwt`.
+`npm run test:integration` checks the `notify` function end to end.
+
+The scheduling logic lives in `src/lib/notify` and is unit-tested. `npm run gen:shared` copies it
+into `supabase/functions/_shared` for the Edge Functions (CI checks the copy is current).
 
 ## Project layout
 

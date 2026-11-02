@@ -1,7 +1,7 @@
 -- RLS: each user sees only their own rows, plus the seeded (global) catalogue.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(17);
 
 -- Two users. The signup trigger should create profiles + default muscle targets.
 insert into auth.users (id, email, instance_id, aud, role)
@@ -11,6 +11,17 @@ values
 
 select is((select count(*)::int from public.profiles where id in ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222')), 2, 'signup trigger creates a profile per user');
 select is((select count(*)::int from public.muscle_targets where user_id = '11111111-1111-1111-1111-111111111111'), 17, 'signup trigger seeds 17 muscle targets');
+select is((select count(*)::int from public.notification_rules where user_id = '11111111-1111-1111-1111-111111111111'), 8, 'signup trigger seeds the 8 notification rules');
+select is((select quiet_start::text from public.profiles where id = '11111111-1111-1111-1111-111111111111'), '22:00:00', 'quiet hours default to 22:00-07:00');
+
+-- The same reminder key can be used by two users, but only once each
+insert into public.notification_log (user_id, type, idempotency_key, status) values
+  ('11111111-1111-1111-1111-111111111111', 'gym', 'gym:2026-11-02:15:00', 'sent'),
+  ('22222222-2222-2222-2222-222222222222', 'gym', 'gym:2026-11-02:15:00', 'sent');
+select throws_ok(
+  $$ insert into public.notification_log (user_id, type, idempotency_key, status)
+     values ('11111111-1111-1111-1111-111111111111', 'gym', 'gym:2026-11-02:15:00', 'sent') $$,
+  '23505', null, 'a reminder is never logged twice for the same user');
 
 -- Act as user A.
 set local role authenticated;
@@ -47,6 +58,10 @@ select throws_ok(
   $$ insert into public.notification_log (user_id, type, idempotency_key, status)
      values ('22222222-2222-2222-2222-222222222222', 'gym', 'x', 'sent') $$,
   '42501', null, 'clients cannot write notification_log');
+
+-- Server-only functions can't be called from the app
+select throws_ok($$ select public.configure_notify('x', 'y') $$, '42501', null, 'clients cannot configure the cron secret');
+select throws_ok($$ select public.run_notify() $$, '42501', null, 'clients cannot trigger notify');
 
 select * from finish();
 rollback;

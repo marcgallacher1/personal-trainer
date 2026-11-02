@@ -840,6 +840,8 @@ export type Database = {
           display_name: string | null
           experience_level: string | null
           goal: string | null
+          goal_event_date: string | null
+          goal_event_name: string | null
           id: string
           notifications_paused_until: string | null
           onboarded_at: string | null
@@ -861,6 +863,8 @@ export type Database = {
           display_name?: string | null
           experience_level?: string | null
           goal?: string | null
+          goal_event_date?: string | null
+          goal_event_name?: string | null
           id: string
           notifications_paused_until?: string | null
           onboarded_at?: string | null
@@ -882,6 +886,8 @@ export type Database = {
           display_name?: string | null
           experience_level?: string | null
           goal?: string | null
+          goal_event_date?: string | null
+          goal_event_name?: string | null
           id?: string
           notifications_paused_until?: string | null
           onboarded_at?: string | null
@@ -1235,7 +1241,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      configure_notify: {
+        Args: { secret: string; url: string }
+        Returns: undefined
+      }
+      run_notify: { Args: never; Returns: undefined }
+      seed_notification_rules: { Args: { uid: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
