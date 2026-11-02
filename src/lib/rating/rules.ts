@@ -11,7 +11,7 @@
 export const BACK_TO_BACK_CREDIT = 0.5
 
 /** Sets per muscle per session before extra sets count half. */
-export const PER_SESSION_MAX = 10
+export const PER_SESSION_MAX = 12
 
 /** Used to split workouts into a push day and a pull day. */
 export const PUSH_MUSCLES: readonly string[] = ['chest', 'front_delts', 'side_delts', 'triceps']

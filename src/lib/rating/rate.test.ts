@@ -304,6 +304,9 @@ function applyRegroup(ws: RatingWorkout[], fix: Fix): RatingWorkout[] {
   }))
 }
 
+const perSession = (r: Rating) =>
+  r.overdone.find((o) => o.muscleId === 'chest' && o.text.includes('sets in'))
+
 describe('spacing and recovery', () => {
   it('marks down cramming the same muscles into Mon and Tue, then resting', () => {
     const crammed = ratePlan(input(monTue))
@@ -347,14 +350,21 @@ describe('spacing and recovery', () => {
     expect(point.alternative).toBeUndefined()
   })
 
-  it('flags too many sets for one muscle in one session', () => {
-    const r = ratePlan(input([one('w', 'Machine Chest Press', 12, [1, 4])]))
-    const chest = r.overdone.find((o) => o.muscleId === 'chest' && o.text.includes('sets in'))
-    expect(chest?.text).toMatch(/^Chest: 12 sets in w\. Past about 10 hard sets/)
-    // Sets past 10 count half
-    expect(subscore(r, 'volume')).toBeLessThan(
-      subscore(ratePlan(input([one('w', 'Machine Chest Press', 10, [1, 4])])), 'volume') + 1,
+  it('flags more than 12 sets for one muscle in one session', () => {
+    // 12 is fine, 13 isn't
+    expect(perSession(ratePlan(input([one('w', 'Machine Chest Press', 12, [1])])))).toBeUndefined()
+    const chest = perSession(ratePlan(input([one('w', 'Machine Chest Press', 13, [1])])))
+    expect(chest?.text).toMatch(/^Chest: 13 sets in w\. Past about 12 hard sets/)
+  })
+
+  it('counts sets past 12 in one session as half', () => {
+    // 16 sets in one go ≈ 14 effective, so short of a 15-set minimum; 2 × 8 isn't
+    const goals15 = goals({ chest: { min: 15, max: 25 } })
+    const once = ratePlan(input([one('w', 'Machine Chest Press', 16, [1])], { muscles: goals15 }))
+    const twice = ratePlan(
+      input([one('w', 'Machine Chest Press', 8, [1, 4])], { muscles: goals15 }),
     )
+    expect(subscore(once, 'volume')).toBeLessThan(subscore(twice, 'volume'))
   })
 
   it('spots back-to-back days in logged training too', () => {
