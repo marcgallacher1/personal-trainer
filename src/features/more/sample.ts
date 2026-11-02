@@ -6,6 +6,7 @@ import type { ExerciseInfo } from '../../lib/analysis/training'
 import { generateSampleHistory, type SamplePlanWorkout } from '../../lib/fixtures/sample'
 import { asLogType } from '../../lib/logging/logTypes'
 import { TEMPLATES } from '../../lib/plans/templates'
+import { isoWeek } from '../../lib/time/london'
 import { londonDate } from '../log/format'
 import { loadPlanRows } from '../plans/data'
 
@@ -153,7 +154,7 @@ export async function loadSampleWorkouts(): Promise<number> {
   return history.length
 }
 
-/** Removes every sample workout (and its exercises and sets). Real workouts are untouched. */
+/** Removes every sample workout, plus reports saved for those weeks. Real workouts are untouched. */
 export async function removeSampleWorkouts(): Promise<number> {
   const sessions = (await db.sessions.toArray()).filter((s) => live(s) && s.notes === SAMPLE_NOTE)
   const ids = sessions.map((s) => s.id)
@@ -161,7 +162,12 @@ export async function removeSampleWorkouts(): Promise<number> {
     db.session_exercises.where('session_id').anyOf(ids).toArray(),
     db.sets.where('session_id').anyOf(ids).toArray(),
   ])
+  const weeks = new Set(sessions.map((s) => isoWeek(londonDate(s.started_at))))
+  const reports = (await db.weekly_reports.toArray()).filter(
+    (r) => live(r) && weeks.has(r.iso_week),
+  )
   const changes: Change[] = [
+    ...reports.map((r) => deletion('weekly_reports', r)),
     ...sets.filter(live).map((r) => deletion('sets', r)),
     ...items.filter(live).map((r) => deletion('session_exercises', r)),
     ...sessions.map((r) => deletion('sessions', r)),

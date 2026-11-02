@@ -138,7 +138,7 @@ function SampleData() {
       <p className="mb-3 text-sm text-muted">
         {count
           ? `${count} sample workouts are loaded. They’re tagged, so removing them never touches workouts you logged yourself.`
-          : 'Fill Progress with 12 weeks of made-up workouts that follow your active plan, to see how the charts work.'}
+          : 'Fill Progress and Weekly reports with 12 weeks of made-up workouts that follow your active plan, to try them out.'}
       </p>
       {count ? (
         <Button variant="secondary" disabled={busy} onClick={() => setConfirmRemove(true)}>
