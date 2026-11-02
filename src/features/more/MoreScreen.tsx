@@ -40,7 +40,21 @@ export function MoreScreen() {
           <span className="text-2xl text-muted">›</span>
         </Link>
 
-        <ComingSoon phase="Phases 4–8">Reports, Data and Settings will live here.</ComingSoon>
+        <Link
+          to="/data"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <span className="text-2xl">🗂️</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-bold">Data</span>
+            <span className="block text-sm text-muted">
+              Every set and workout as a table · edit, export or import
+            </span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+
+        <ComingSoon phase="Phases 4–8">Reports and Settings will live here.</ComingSoon>
 
         <SampleData />
 

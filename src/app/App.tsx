@@ -21,6 +21,7 @@ import { PlanHistoryScreen } from '../features/plans/PlanHistoryScreen'
 import { PlanSessionScreen } from '../features/plans/PlanSessionScreen'
 import { PlansScreen } from '../features/plans/PlansScreen'
 import { RatingScreen } from '../features/plans/RatingScreen'
+import { DataScreen } from '../features/data/DataScreen'
 import { MuscleScreen } from '../features/progress/MuscleScreen'
 import { PlanFollowScreen } from '../features/progress/PlanFollowScreen'
 import { ProgressScreen } from '../features/progress/ProgressScreen'
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: '/progress', element: <ProgressScreen /> },
       { path: '/progress/plan', element: <PlanFollowScreen /> },
       { path: '/progress/muscles', element: <MuscleScreen /> },
+      { path: '/data', element: <DataScreen /> },
       { path: '/plans', element: <PlansScreen /> },
       { path: '/plans/new', element: <PlanBuilderScreen /> },
       { path: '/plans/:planId', element: <PlanEditorScreen /> },
