@@ -123,7 +123,7 @@ describe('go to the gym', () => {
 
   it('names the planned workout', () => {
     const [d] = dueNotifications(state(`${MON}T15:00:00Z`))
-    expect(d!.title).toBe('Push A today')
+    expect(d!.title).toBe('Push A today 🏋️')
     expect(d!.body).toContain('Push A')
   })
 
@@ -176,7 +176,7 @@ describe('other reminders', () => {
   it('flags a missed plan workout at 20:00 and suggests another day', () => {
     // Tue: Pull A not started; Wed is free
     const [d] = dueNotifications(state('2026-11-03T20:00:00Z'))
-    expect(d).toMatchObject({ key: 'missed:2026-11-03', title: 'Pull A not started' })
+    expect(d).toMatchObject({ key: 'missed:2026-11-03', title: 'Pull A not started 📅' })
     expect(d!.body).toContain('Tomorrow morning’s free')
     expect(
       keys(state('2026-11-03T20:00:00Z', { workoutToday: true })).filter((k) =>
@@ -245,7 +245,7 @@ describe('celebrations', () => {
       keys(state(`${MON}T09:00:00Z`, { goal })).filter((k) => k.startsWith('countdown')),
     ).toEqual([])
     const [d] = dueNotifications(state('2026-11-28T09:00:00Z', { goal }))
-    expect(d).toMatchObject({ key: 'countdown:2026-12-28:30', title: '30 days to Australia' })
+    expect(d).toMatchObject({ key: 'countdown:2026-12-28:30', title: '30 days to Australia ✈️' })
     expect(dueNotifications(state('2026-12-28T09:00:00Z', { goal }))[0]!.title).toBe(
       'Australia day! ✈️',
     )

@@ -160,7 +160,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'gym',
             `gym:${today.date}:${t}`,
-            planned.length ? `${workoutName} today` : 'Time to train',
+            planned.length ? `${workoutName} today 🏋️` : 'Time to train 🏋️',
             { pool: 'gym', vars: { workout: workoutName } },
             '/',
             r.skipIfLogged && s.workoutToday ? 'already logged' : undefined,
@@ -172,7 +172,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'gym',
             `gym:${today.date}:f${t}`,
-            'Log it or go',
+            'Log it or go ⏰',
             { pool: 'gym_followup', vars: { workout: workoutName } },
             s.openWorkout ? `/log/session/${s.openWorkout.id}` : '/',
             s.workoutToday ? 'already logged' : undefined,
@@ -189,7 +189,7 @@ export function dueNotifications(s: NotifyState): Due[] {
           r,
           'log_session',
           `log:${w.id}`,
-          'Save your workout',
+          'Save your workout 📝',
           { pool: 'log_session', vars: { workout: w.name ?? 'your workout' }, goal: false },
           `/log/session/${w.id}`,
         )
@@ -204,7 +204,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'missed_workout',
             `missed:${today.date}`,
-            `${workoutName} not started`,
+            `${workoutName} not started 📅`,
             {
               pool: 'missed_workout',
               vars: {
@@ -233,7 +233,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'protein',
             `protein:${today.date}:${t}`,
-            'Protein check',
+            'Protein check 🥩',
             {
               pool: 'protein',
               vars: { grams },
@@ -252,7 +252,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'bodyweight',
             `bodyweight:${today.date}:${t}`,
-            'Weigh-in',
+            'Weigh-in ⚖️',
             {
               pool: 'bodyweight',
               vars: {},
@@ -267,7 +267,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'bodyweight',
             `bodyweight:${today.date}:f${t}`,
-            'Weigh-in',
+            'Weigh-in ⚖️',
             {
               pool: 'bodyweight_followup',
               vars: {},
@@ -311,7 +311,7 @@ export function dueNotifications(s: NotifyState): Due[] {
               direct(
                 'celebration',
                 `countdown:${s.goal.date}:${goalDays}`,
-                goalDays === 0 ? `${s.goal.name} day! ✈️` : `${goalDays} days to ${s.goal.name}`,
+                goalDays === 0 ? `${s.goal.name} day! ✈️` : `${goalDays} days to ${s.goal.name} ✈️`,
                 goalDays === 0
                   ? 'You put the work in. Enjoy it.'
                   : goalDays === 1
@@ -331,7 +331,7 @@ export function dueNotifications(s: NotifyState): Due[] {
           direct(
             'weekly_rundown',
             `rundown:${s.rundown}`,
-            'Your weekly rundown',
+            'Your weekly rundown 📊',
             'This week’s report is ready. Tap to see how you did.',
             `/report/${s.rundown}`,
           )
