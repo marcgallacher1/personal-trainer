@@ -7,7 +7,7 @@ import { showToast } from '../../components/Toast'
 import { updateProfile, useProfile, type Profile } from '../plans/data'
 import { RULE_INFO, saveRule, summarise, useRules, type RuleEntry } from './data'
 import { disablePush, enablePush, pushStatus, sendTestPush, type PushStatus } from './push'
-import { Field, RuleEditor } from './RuleEditor'
+import { RuleEditor } from './RuleEditor'
 
 export function SettingsScreen() {
   const profile = useProfile()
@@ -164,26 +164,32 @@ export function GoalCard({ profile }: { profile: Profile }) {
           A holiday or event. Reminders count down to it to keep you locked in.
         </p>
       </div>
-      <div className="grid grid-cols-[1fr_auto] gap-2">
-        <input
-          key={`name-${profile.updated_at}`}
-          defaultValue={profile.goal_event_name ?? ''}
-          placeholder="e.g. Australia"
-          aria-label="What you're training for"
-          onBlur={(e) => {
-            const v = e.target.value.trim() || null
-            if (v !== profile.goal_event_name) void updateProfile(profile, { goal_event_name: v })
-          }}
-          className="h-12 min-w-0 rounded-xl border border-border bg-bg px-3 outline-none focus:border-accent"
-        />
-        <input
-          key={`date-${profile.updated_at}`}
-          type="date"
-          defaultValue={profile.goal_event_date ?? ''}
-          aria-label="Date"
-          onChange={(e) => void updateProfile(profile, { goal_event_date: e.target.value || null })}
-          className="h-12 rounded-xl border border-border bg-bg px-3 outline-none focus:border-accent"
-        />
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-bg">
+        <label className="flex items-center justify-between gap-3 px-4 py-2">
+          <span className="font-semibold">What</span>
+          <input
+            key={`name-${profile.updated_at}`}
+            defaultValue={profile.goal_event_name ?? ''}
+            placeholder="e.g. Australia"
+            onBlur={(e) => {
+              const v = e.target.value.trim() || null
+              if (v !== profile.goal_event_name) void updateProfile(profile, { goal_event_name: v })
+            }}
+            className="h-10 min-w-0 flex-1 rounded-lg bg-surface-2 px-3 text-right outline-none focus:ring-2 focus:ring-accent"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 px-4 py-2">
+          <span className="font-semibold">When</span>
+          <input
+            key={`date-${profile.updated_at}`}
+            type="date"
+            defaultValue={profile.goal_event_date ?? ''}
+            onChange={(e) =>
+              void updateProfile(profile, { goal_event_date: e.target.value || null })
+            }
+            className={`${PICKER} w-40`}
+          />
+        </label>
       </div>
     </section>
   )
@@ -198,25 +204,45 @@ export function QuietCard({ profile }: { profile: Profile }) {
         <p className="font-bold">Quiet hours</p>
         <p className="text-sm text-muted">Nothing is sent in this window.</p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="From">
-          <input
-            type="time"
-            value={time(profile.quiet_start)}
-            onChange={(e) => void updateProfile(profile, { quiet_start: e.target.value || null })}
-            className="h-12 w-full rounded-xl border border-border bg-bg px-3 tabular-nums"
-          />
-        </Field>
-        <Field label="Until">
-          <input
-            type="time"
-            value={time(profile.quiet_end)}
-            onChange={(e) => void updateProfile(profile, { quiet_end: e.target.value || null })}
-            className="h-12 w-full rounded-xl border border-border bg-bg px-3 tabular-nums"
-          />
-        </Field>
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-bg">
+        <TimeRow
+          label="From"
+          value={time(profile.quiet_start)}
+          onChange={(v) => void updateProfile(profile, { quiet_start: v })}
+        />
+        <TimeRow
+          label="Until"
+          value={time(profile.quiet_end)}
+          onChange={(v) => void updateProfile(profile, { quiet_end: v })}
+        />
       </div>
     </section>
+  )
+}
+
+/** iOS gives time/date inputs a fixed width; `appearance-none` lets them fit the row. */
+const PICKER =
+  'h-10 min-w-0 appearance-none rounded-lg bg-surface-2 px-3 text-right text-lg tabular-nums outline-none focus:ring-2 focus:ring-accent'
+
+function TimeRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string | null) => void
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 px-4 py-2">
+      <span className="font-semibold">{label}</span>
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value || null)}
+        className={`${PICKER} w-28`}
+      />
+    </label>
   )
 }
 

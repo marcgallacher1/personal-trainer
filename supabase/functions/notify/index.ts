@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     return new Response('Unauthorised', { status: 401 })
   }
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const body = (await req.json().catch(() => ({}))) as { now?: string; test?: boolean }
+  const body = (await req.json().catch(() => ({}))) as { now?: string }
   // `now` can be overridden for testing
   const now = body.now ?? new Date().toISOString()
 
@@ -29,19 +29,6 @@ Deno.serve(async (req) => {
 
   const results: Record<string, unknown> = {}
   const users = new Set(subs.map((s) => s.user_id))
-
-  // { test: true }: send a test to every subscribed device (used after deploying)
-  if (body.test) {
-    for (const userId of users) {
-      results[userId] = await sendToUser(db, userId, {
-        title: 'Notifications are live ✅',
-        body: 'Trainer can reach you with the app closed. See you at the gym.',
-        url: '/settings',
-        tag: 'test',
-      })
-    }
-    return Response.json({ now, results })
-  }
 
   for (const userId of users) {
     try {
