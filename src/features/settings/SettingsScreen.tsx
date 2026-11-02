@@ -164,9 +164,8 @@ export function GoalCard({ profile }: { profile: Profile }) {
           A holiday or event. Reminders count down to it to keep you locked in.
         </p>
       </div>
-      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-bg">
-        <label className="flex items-center justify-between gap-3 px-4 py-2">
-          <span className="font-semibold">What</span>
+      <div className="flex flex-col gap-2">
+        <Field label="What">
           <input
             key={`name-${profile.updated_at}`}
             defaultValue={profile.goal_event_name ?? ''}
@@ -175,11 +174,10 @@ export function GoalCard({ profile }: { profile: Profile }) {
               const v = e.target.value.trim() || null
               if (v !== profile.goal_event_name) void updateProfile(profile, { goal_event_name: v })
             }}
-            className="h-10 min-w-0 flex-1 rounded-lg bg-surface-2 px-3 text-right outline-none focus:ring-2 focus:ring-accent"
+            className={INPUT}
           />
-        </label>
-        <label className="flex items-center justify-between gap-3 px-4 py-2">
-          <span className="font-semibold">When</span>
+        </Field>
+        <Field label="When">
           <input
             key={`date-${profile.updated_at}`}
             type="date"
@@ -187,9 +185,9 @@ export function GoalCard({ profile }: { profile: Profile }) {
             onChange={(e) =>
               void updateProfile(profile, { goal_event_date: e.target.value || null })
             }
-            className={`${PICKER} w-40`}
+            className={INPUT}
           />
-        </label>
+        </Field>
       </div>
     </section>
   )
@@ -204,7 +202,7 @@ export function QuietCard({ profile }: { profile: Profile }) {
         <p className="font-bold">Quiet hours</p>
         <p className="text-sm text-muted">Nothing is sent in this window.</p>
       </div>
-      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-bg">
+      <div className="flex flex-col gap-2">
         <TimeRow
           label="From"
           value={time(profile.quiet_start)}
@@ -220,9 +218,19 @@ export function QuietCard({ profile }: { profile: Profile }) {
   )
 }
 
-/** iOS gives time/date inputs a fixed width; `appearance-none` lets them fit the row. */
-const PICKER =
-  'h-10 min-w-0 appearance-none rounded-lg bg-surface-2 px-3 text-right text-lg tabular-nums outline-none focus:ring-2 focus:ring-accent'
+/** Every settings input: same size, no inner box. `appearance-none` stops iOS fixing the width. */
+const INPUT =
+  'h-full min-w-0 flex-1 appearance-none bg-transparent text-right text-lg tabular-nums outline-none placeholder:text-muted/60'
+
+/** A labelled row: label on the left, value on the right. */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex h-14 items-center gap-3 rounded-xl bg-surface-2 px-4 focus-within:ring-2 focus-within:ring-accent">
+      <span className="shrink-0 font-semibold">{label}</span>
+      {children}
+    </label>
+  )
+}
 
 function TimeRow({
   label,
@@ -234,15 +242,14 @@ function TimeRow({
   onChange: (v: string | null) => void
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 px-4 py-2">
-      <span className="font-semibold">{label}</span>
+    <Field label={label}>
       <input
         type="time"
         value={value}
         onChange={(e) => onChange(e.target.value || null)}
-        className={`${PICKER} w-28`}
+        className={INPUT}
       />
-    </label>
+    </Field>
   )
 }
 

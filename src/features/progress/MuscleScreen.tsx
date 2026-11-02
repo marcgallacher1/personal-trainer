@@ -82,7 +82,10 @@ function WeekView({ data }: { data: TrainingData }) {
         <button
           type="button"
           disabled={week <= first}
-          onClick={() => setWeek(addDays(week, -7))}
+          onClick={() => {
+            setWeek(addDays(week, -7))
+            window.scrollTo({ top: 0 })
+          }}
           className="h-10 rounded-xl bg-surface-2 px-4 font-semibold disabled:opacity-40"
         >
           ‹ Earlier
@@ -90,7 +93,10 @@ function WeekView({ data }: { data: TrainingData }) {
         <button
           type="button"
           disabled={week >= current}
-          onClick={() => setWeek(addDays(week, 7))}
+          onClick={() => {
+            setWeek(addDays(week, 7))
+            window.scrollTo({ top: 0 })
+          }}
           className="h-10 rounded-xl bg-surface-2 px-4 font-semibold disabled:opacity-40"
         >
           Later ›

@@ -75,6 +75,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* iOS date/time inputs: right-align the value like the other fields */
+input::-webkit-date-and-time-value {
+  text-align: right;
+}
+
 /* Safe-area helpers for notch + home indicator */
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);

@@ -43,6 +43,11 @@ function Report({
 }) {
   const stored = useStoredReport(report.week)
 
+  // Each week opens at the top (Earlier / Later are at the bottom)
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [])
+
   // Save finished weeks so they're kept on the server too
   useEffect(() => {
     if (report.final) void storeReport(report)
