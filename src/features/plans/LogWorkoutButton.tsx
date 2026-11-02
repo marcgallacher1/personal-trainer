@@ -5,7 +5,9 @@ import { Sheet } from '../../components/Sheet'
 import { DAY_NAMES } from '../../lib/plans/draft'
 import type { PlanSessionRow } from '../../lib/plans/instantiate'
 import { isoWeekday } from '../../lib/plans/schedule'
-import { startSession } from '../log/actions'
+import { useExercises } from '../../db/queries'
+import { markApplied, todayExtras, usePlanChanges } from '../coach/data'
+import { addExercise, startSession } from '../log/actions'
 import { londonDate } from '../log/format'
 import { startFromPlan, usePlanLibrary } from './data'
 
@@ -22,7 +24,14 @@ export function LogWorkoutButton() {
       .filter((d) => d.plan_session_id === s.id && d.weekday !== null)
       .map((d) => d.weekday!)
       .toSorted((a, b) => a - b)
-  const todays = active ? active.versions.filter((s) => daysOf(s).includes(today)) : []
+  const exercises = useExercises()
+  const extras = todayExtras(usePlanChanges())
+  const movesOf = (s: PlanSessionRow) => extras.moved.filter((m) => m.workoutId === s.id)
+  const foldsInto = (s: PlanSessionRow) => extras.folds.filter((f) => f.intoWorkoutId === s.id)
+  const nameOf = (id: string) => exercises?.find((e) => e.id === id)?.name ?? 'Exercise'
+  const todays = active
+    ? active.versions.filter((s) => daysOf(s).includes(today) || movesOf(s).length > 0)
+    : []
   const others = active ? active.versions.filter((s) => !todays.includes(s)) : []
 
   async function go(start: () => Promise<string>) {
@@ -30,6 +39,34 @@ export function LogWorkoutButton() {
     setOpen(false)
     void navigate(`/log/session/${id}`)
   }
+
+  /** Starts a plan workout, adding any lifts folded in from a missed one. */
+  function startPlanned(s: PlanSessionRow) {
+    void go(async () => {
+      const id = await startFromPlan(s)
+      for (const f of foldsInto(s)) {
+        for (const exId of f.exerciseIds) {
+          const ex = exercises?.find((e) => e.id === exId)
+          if (ex) await addExercise(id, ex)
+        }
+        await markApplied(f.change)
+      }
+      for (const m of movesOf(s)) await markApplied(m.change)
+      return id
+    })
+  }
+
+  /** "Moved to today" / "+ Bench Press from Push" */
+  const todayDetail = (s: PlanSessionRow) =>
+    [
+      movesOf(s).length > 0 && 'Moved to today',
+      ...foldsInto(s).map((f) => {
+        const from = active?.versions.find((v) => v.id === f.fromWorkoutId)?.name
+        return `+ ${f.exerciseIds.map(nameOf).join(', ')}${from ? ` from ${from}` : ''}`
+      }),
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined
 
   return (
     <>
@@ -65,7 +102,8 @@ export function LogWorkoutButton() {
                     key={s.id}
                     session={s}
                     highlight
-                    onStart={() => void go(() => startFromPlan(s))}
+                    detail={todayDetail(s)}
+                    onStart={() => startPlanned(s)}
                   />
                 ))}
               </div>
@@ -87,7 +125,7 @@ export function LogWorkoutButton() {
                       detail={
                         days.length ? days.map((d) => DAY_NAMES[d - 1]).join(', ') : 'Any day'
                       }
-                      onStart={() => void go(() => startFromPlan(s))}
+                      onStart={() => startPlanned(s)}
                     />
                   )
                 })}

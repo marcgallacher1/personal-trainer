@@ -6,6 +6,7 @@ import { weekProgress, weekStart, type WorkoutRef } from '../../lib/plans/schedu
 import { addDays, weekdayOf } from '../../lib/analysis/training'
 import { isoWeek } from '../../lib/time/london'
 import { formatDuration, londonDate, sessionTitle } from '../log/format'
+import { SuggestionCard } from '../coach/SuggestionCard'
 import { useProfile } from '../plans/data'
 import { LogWorkoutButton } from '../plans/LogWorkoutButton'
 import { WEEKDAYS } from '../plans/WeekdayPicker'
@@ -55,6 +56,8 @@ export function TodayScreen() {
         )}
 
         <WeekCard done={week.done} target={week.target} days={week.days} today={today} />
+
+        <SuggestionCard />
 
         <RundownLink today={today} />
 

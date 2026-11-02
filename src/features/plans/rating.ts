@@ -131,7 +131,11 @@ export function useActualRating(ctx: RatingContext | undefined): ActualRating | 
 }
 
 /** Applies a one-tap fix to the plan: adds an exercise, or changes how many sets one has. */
-export async function applyFix(planId: string, fix: Fix): Promise<void> {
+export async function applyFix(
+  planId: string,
+  fix: Fix,
+  note = 'Applied a rating fix',
+): Promise<void> {
   if (fix.kind === 'add') {
     const exercise = await db.exercises.get(fix.exerciseId)
     if (!exercise) throw new Error('Exercise not found')
@@ -174,5 +178,5 @@ export async function applyFix(planId: string, fix: Fix): Promise<void> {
       .toSorted((a, b) => a.order - b.order)
     await setTargets(pe, withWorkingSets(targets, fix.sets))
   }
-  await snapshotIfChanged(planId, 'Applied a rating fix')
+  await snapshotIfChanged(planId, note)
 }

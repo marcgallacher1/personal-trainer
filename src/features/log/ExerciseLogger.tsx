@@ -3,6 +3,8 @@ import { ChoiceDialog } from '../../components/ChoiceDialog'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
 import { describeTarget } from '../../lib/plans/targets'
+import { describeTarget as describeGoal, todaysTarget } from '../../lib/adaptive/progression'
+import { resetFor, usePlanChanges } from '../coach/data'
 import { ExerciseList } from '../exercises/ExerciseList'
 import { removeFromPlan, swapExercise, usePlanExercise, usePlanTargets } from '../plans/data'
 import {
@@ -77,6 +79,25 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   const alternatives = (planExercise?.alternatives ?? [])
     .map((id) => library?.find((e) => e.id === id))
     .filter((e): e is Exercise => Boolean(e))
+  // Today's target (a hint; inputs still start blank)
+  const planChanges = usePlanChanges()
+  const plannedWorking = targets.filter((t) => t.set_type !== 'warmup')
+  const goal = todaysTarget({
+    last:
+      previous?.sets.map((s) => ({
+        weightKg: Number(s.weight_kg),
+        reps: s.reps,
+        rir: s.rir,
+        setType: s.set_type,
+      })) ?? null,
+    repsMin: plannedWorking[0]?.reps_min ?? null,
+    repsMax: plannedWorking[0]?.reps_max ?? null,
+    targetRir: plannedWorking[0]?.target_rir ?? null,
+    isCompound: exercise?.is_compound ?? false,
+    logType,
+    resetKg: resetFor(planChanges, se.exercise_id, previous?.date ?? null),
+  })
+
   const nextInitial: EditorValue = {
     ...draft,
     // Follow the plan's set type (e.g. a planned warm-up) when there is one
@@ -154,6 +175,22 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
       }
     >
       <div className="flex flex-col gap-5">
+        {goal && (
+          <section className="flex gap-3 rounded-2xl bg-accent/10 p-4">
+            <span className="text-2xl">🎯</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold tracking-wide text-accent uppercase">
+                Today’s target
+              </span>
+              <span className="block text-lg font-bold tabular-nums">
+                {describeGoal(goal)}
+                {goal.heavier && ' ⬆️'}
+              </span>
+              <span className="block text-sm text-muted">{goal.why}</span>
+            </span>
+          </section>
+        )}
+
         {/* Logged sets */}
         <section>
           <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">
