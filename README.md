@@ -1,8 +1,17 @@
 # Trainer
 
-A single-user personal trainer PWA: fast offline set logging, customisable plans, analysis, weekly
-rundowns and server-scheduled push reminders. It's installed on iPhone via Safari → **Add to Home Screen**.
-It runs entirely on free tiers (Supabase and Vercel).
+A single-user personal trainer PWA. It's installed on iPhone via Safari → **Add to Home Screen** and runs
+entirely on free tiers (Supabase and Vercel).
+
+- **Logging:** fast, offline set logging with a rest timer. Workouts are live (Start workout) or entered
+  afterwards (Log workout). Weights can mean the total, each dumbbell, or left and right for single-arm moves.
+- **Plans:** a plan builder and editor with drag-to-reorder and version history. A plan rating with
+  one-tap fixes. "Suggested today" picks the best workout from what's left this week.
+- **Analysis:** Progress charts, plan adherence, PBs and stalls, a rating for every workout, and weekly
+  reports with 3 actions for next week.
+- **Coaching:** a "Today's target" for each lift, plus suggestions you accept or skip (missed workouts,
+  stalled lifts, muscles under or over target).
+- **Reminders:** push notifications sent by the server, with quiet hours and pause.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how data flows through the system.
 
@@ -50,8 +59,14 @@ Supabase Studio is at <http://127.0.0.1:54323>.
 ### Changing the exercise catalogue
 
 Edit `src/lib/seed/exercises.ts`, then run `npm run gen:seed` and `npm run db:reset`. The muscles and
-exercises are shipped as a **migration**, not in `seed.sql`, so `supabase db push` puts them on the hosted DB as
-well. Seeded exercise IDs are deterministic UUIDv5s generated from the name (see `scripts/seed-ids.ts`). CI
+exercises are shipped as **migrations**, not in `seed.sql`, so `supabase db push` puts them on the hosted DB as
+well. A migration that has already been applied won't run again on the hosted DB, so changes to the
+catalogue need a new migration. `gen:seed` writes the latest catalogue refresh
+(`20261103000000_load_modes.sql`); for later changes, add a new output file in
+`scripts/gen-reference-sql.ts`. Each exercise also has a `loadMode`:
+`total` (60 kg on the bar, bar included), `per_hand` (each dumbbell or handle) or `per_side`
+(single-arm or single-leg: left and right logged side by side). To rename an exercise without losing
+its history, keep its old name in `ID_NAMES`. Seeded exercise IDs are deterministic UUIDv5s generated from the name (see `scripts/seed-ids.ts`). CI
 fails if the generated migration is out of date.
 
 ## Hosted Supabase setup
@@ -75,7 +90,7 @@ fails if the generated migration is out of date.
 > you configure custom SMTP.
 >
 > Free-tier projects pause after 7 days with no API activity. Normal use of the app (and the
-> notification cron, from Phase 4) keeps the project active.
+> notification cron) keeps the project active.
 
 ## Deploying to Vercel
 
@@ -127,7 +142,20 @@ in `VITE_VAPID_PUBLIC_KEY` in `.env.local`, then
 `npm run test:integration` checks the `notify` function end to end.
 
 The scheduling logic lives in `src/lib/notify` and is unit-tested. `npm run gen:shared` copies it
-into `supabase/functions/_shared` for the Edge Functions (CI checks the copy is current).
+into `supabase/functions/_shared` for the Edge Functions (CI checks the copy is current). After
+changing it, redeploy with `supabase functions deploy notify --no-verify-jwt`.
+
+## Weekly reports
+
+Reports are built on the phone from your logs (More → Weekly reports). The Sunday rundown push
+opens the week's report. Finished weeks are also saved to `weekly_reports`.
+
+**Optional AI note (off by default):** a short write-up by Claude on top of the rules-based report.
+Only the report's numbers are sent, never raw logs. To switch it on:
+
+1. `supabase secrets set ANTHROPIC_API_KEY=...`
+2. `supabase functions deploy report-summary`
+3. Set `VITE_REPORT_AI=on` in Vercel's environment variables and redeploy.
 
 ## Project layout
 
@@ -135,9 +163,13 @@ into `supabase/functions/_shared` for the Edge Functions (CI checks the copy is 
 src/app         routing, layout, tab bar, error boundary
 src/features    screens grouped by feature
 src/components  shared UI
-src/lib         PURE logic and Vitest tests (seed catalogue, platform detection, later analysis/progression…)
+src/lib         PURE logic and Vitest tests:
+                  analysis (volume, strength, adherence), rating (plan score), report (weekly),
+                  adaptive (today's target, coach suggestions), review (workout rating),
+                  plans (builder, templates, suggested workout), logging (load modes, rest, PBs),
+                  notify (what's due), seed (catalogue), time, ui
 src/db          Supabase client, Dexie schema, outbox and sync worker, generated DB types
 src/sw.ts       service worker (precache, offline SPA, push, notificationclick)
-supabase/       migrations, pgTAP tests, edge functions (later)
+supabase/       migrations, pgTAP tests, Edge Functions (notify, test-push, report-summary)
 scripts/        code generators
 ```

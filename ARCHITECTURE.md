@@ -91,7 +91,7 @@ snapshot's rows and soft-deletes anything added since.
 
 **Workouts from plans:** `startFromPlan` copies a version's exercises into the workout, linked by
 `plan_exercise_id`, and names it e.g. "Push A". Each logged set records its `plan_set_target_id`.
-Targets are shown as hints only; weights never carry over between workouts. Mid-workout edits
+Targets are shown as hints only: inputs start blank, and weights never carry over between workouts. Mid-workout edits
 (add, swap, remove) ask whether to apply them today only or also to the plan.
 
 ## Navigation
@@ -110,3 +110,49 @@ wall-clock times, so clock changes are handled. Quiet hours and pauses log a rem
 "skipped" instead of sending it. The unique `(user_id, idempotency_key)` on `notification_log` is
 the final guard against duplicates. Dead subscriptions (404/410) are removed, and the app
 re-sends its subscription each time it starts.
+
+## Logging
+
+- **Live or afterwards.** **Start workout** (Today) times the workout live. **Log workout** (the Log
+  tab) asks for the day, start time and length, and spaces the sets through that window.
+- **What the weight means.** Each exercise has a `load_mode`:
+  - `total`: the whole load, bar included.
+  - `per_hand`: each of two dumbbells or handles, so volume counts double.
+  - `per_side`: single-arm or single-leg moves. Left goes in `weight_kg`/`reps` and right in
+    `right_weight_kg`/`right_reps`.
+
+  Volume uses the real load (`src/lib/logging/load.ts`). PBs and strength trends use the stronger side.
+
+- **Rest.** Rest is worked out from when each set was logged, minus about 45 s for doing the set
+  (`src/lib/logging/rest.ts`). A live timer shows while you train. Gaps over 15 minutes aren't rest.
+
+## Coaching
+
+All of this is pure, tested logic in `src/lib`. Nothing changes the plan without you choosing it.
+
+- **Today's target** (`adaptive/progression.ts`) uses double progression. Add reps until every set
+  hits the top of the range, then add 2.5 kg (compounds) or 1 kg (isolations). Weights are only
+  suggested once a lift has 3 workouts of data. Before that it just says the rep range. Bodyweight
+  moves below the range count as building up, not failing.
+- **Coach suggestions** (`adaptive/proposals.ts`) appear as one card on Today, with options and
+  "Not now":
+  - a missed workout: move it to a free day, or add its key lifts to the next workout;
+  - a stalled lift (no new best in 3 workouts): a 90% reset, a different rep range, or a fair swap;
+  - a muscle under or over target two weeks running, when the plan is the cause.
+
+  Each decision is a `plan_changes` row (so it isn't asked again). Plan edits are saved as plan
+  versions, which is the changelog. There are no deload suggestions, by choice.
+
+- **Suggested today** (`plans/suggest.ts`) picks from the plan workouts not done this week. Muscles
+  trained in the last 48 h count against a workout, and missed workouts come before today's scheduled
+  one.
+
+## Analysis
+
+- **Plan adherence** (`analysis/adherence.ts`): week 1 is the week you first train on the plan (from
+  its Monday, so a missed day that week counts). A week still in progress only counts the workouts
+  due so far. Fair swaps count in full.
+- **Workout rating** (`review/workout.ts`): starts at 100, and every point taken off comes with a
+  "To work on" reason, e.g. down vs last time, skipped plan exercises, too many sets for one muscle,
+  easy sets, or a very long session. It's worked out when you view it; nothing is stored.
+- **Weekly report** (`report/weekly.ts`): see Principles above.
