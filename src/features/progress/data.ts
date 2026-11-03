@@ -4,6 +4,7 @@ import type { PlannedWorkout } from '../../lib/analysis/adherence'
 import { actualMuscles } from '../../lib/analysis/muscles'
 import { bestSide, setTonnage } from '../../lib/logging/load'
 import { asLoadMode } from '../../lib/logging/types'
+import { planStart } from '../../lib/analysis/adherence'
 import type { TrainingSession } from '../../lib/analysis/training'
 import { planWorkouts } from '../../lib/rating/inputs'
 import type { MuscleVolume } from '../../lib/rating/rate'
@@ -77,6 +78,7 @@ export function useTrainingData(): TrainingData | undefined {
         id: w.id,
         name: w.name,
         perWeek: w.timesPerWeek,
+        days: w.days,
         exercises: w.exercises.map((e) => ({
           exerciseId: e.exerciseId,
           sets: e.sets.filter((t) => t.set_type !== 'warmup').length,
@@ -87,8 +89,7 @@ export function useTrainingData(): TrainingData | undefined {
     ? logged.sessions.find((s) => s.planId === active.plan.id)?.date
     : undefined
   const created = active ? londonDate(active.plan.created_at) : null
-  const planSince =
-    created && firstOnPlan ? (firstOnPlan < created ? firstOnPlan : created) : (created ?? null)
+  const planSince = planStart(firstOnPlan ?? null, created)
 
   return { sessions: logged.sessions, ctx, today: logged.today, active, planned, planSince }
 }

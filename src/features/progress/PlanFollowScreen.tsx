@@ -6,6 +6,7 @@ import { ChartCard, Legend } from '../../components/charts/ChartCard'
 import { LineChart } from '../../components/charts/LineChart'
 import { shortDate } from '../../components/charts/scales'
 import {
+  basisLabel,
   rollingAdherence,
   summariseAdherence,
   weeklyAdherence,
@@ -55,7 +56,7 @@ function Detail({ data, since }: { data: TrainingData; since: string }) {
   return (
     <>
       <section className="grid grid-cols-3 gap-2 text-center">
-        <Stat value={s.score === null ? '—' : pct(s.score)} label="last 4 weeks" />
+        <Stat value={s.score === null ? '—' : pct(s.score)} label={basisLabel(s.basis)} />
         <Stat value={`${s.currentStreak}`} label={`week streak${s.currentStreak ? ' 🔥' : ''}`} />
         <Stat value={`${s.longestStreak}`} label="longest streak" />
       </section>

@@ -46,6 +46,8 @@ export interface PlannedWorkout {
   name: string
   /** Times a week (days it's on, or 1 if it has no set day) */
   perWeek: number
+  /** ISO weekdays it's on, if set (lets a part week count only what was due) */
+  days?: readonly number[]
   exercises: readonly { exerciseId: string; sets: number }[]
 }
 
@@ -129,9 +131,11 @@ export interface SessionAdherence {
 export interface WeekAdherence {
   week: string
   planned: number
+  /** Planned workouts due so far: the full week once it's over, fewer in a part week */
+  due: number
   /** Workouts logged that week */
   done: number
-  /** 0–1: planned workouts done, weighted by how closely each matched */
+  /** 0–1: due workouts done, weighted by how closely each matched */
   score: number
   sessions: SessionAdherence[]
 }
@@ -190,19 +194,52 @@ export function weeklyAdherence(
           },
       )
     const earned = [...assigned.values()].reduce((a, x) => a + (x.match?.score ?? 0), 0)
+    const due = dueIn(plan, week, from, to)
     return {
       week,
       planned: slotsPerWeek,
+      due,
       done: inWeek.length,
-      score: slotsPerWeek ? Math.min(1, earned / slotsPerWeek) : 0,
+      score: due ? Math.min(1, earned / due) : 0,
       sessions: list,
     }
   })
 }
 
+/**
+ * Week 1 of a plan: the Monday of the week you first trained on it (so a missed day earlier
+ * that week still counts), but never before the plan existed. Empty weeks before don't count.
+ */
+export function planStart(firstWorkout: string | null, created: string | null): string | null {
+  if (!firstWorkout) return created
+  const monday = weekOf(firstWorkout)
+  if (!created) return monday
+  return created > monday ? (created < firstWorkout ? created : firstWorkout) : monday
+}
+
+/** Workouts due in a week between `from` and `to` (both inclusive). */
+function dueIn(plan: readonly PlannedWorkout[], week: string, from: string, to: string): number {
+  const end = addDays(week, 6)
+  let due = 0
+  for (const w of plan) {
+    if (w.days?.length) {
+      due += w.days.filter((d) => {
+        const date = addDays(week, d - 1)
+        return date >= from && date <= to
+      }).length
+    } else if (end <= to && week >= weekOf(from)) {
+      // No set day: due by the end of the week
+      due += w.perWeek
+    }
+  }
+  return due
+}
+
 export interface AdherenceSummary {
-  /** Average of finished weeks in the window (0–1), or null if none yet */
+  /** Average of finished weeks in the window, or this week so far if none are finished (0–1) */
   score: number | null
+  /** What the score covers: finished weeks, or just this week so far */
+  basis: { kind: 'weeks'; count: number } | { kind: 'this-week' } | null
   thisWeek: WeekAdherence | null
   currentStreak: number
   longestStreak: number
@@ -231,12 +268,25 @@ export function summariseAdherence(
   for (let i = finished.length - 1; i >= 0 && hit(finished[i]!); i--) streak++
   if (thisWeek && hit(thisWeek)) streak++
 
+  const soFar = thisWeek && thisWeek.due > 0 ? thisWeek.score : null
   return {
-    score: recent.length ? recent.reduce((a, w) => a + w.score, 0) / recent.length : null,
+    score: recent.length ? recent.reduce((a, w) => a + w.score, 0) / recent.length : soFar,
+    basis: recent.length
+      ? { kind: 'weeks', count: recent.length }
+      : soFar !== null
+        ? { kind: 'this-week' }
+        : null,
     thisWeek,
     currentStreak: streak,
     longestStreak: Math.max(longest, streak),
   }
+}
+
+/** "this week so far", "last week", "last 3 weeks" */
+export function basisLabel(basis: AdherenceSummary['basis']): string {
+  if (!basis) return 'nothing due yet'
+  if (basis.kind === 'this-week') return 'this week so far'
+  return basis.count === 1 ? 'last week' : `last ${basis.count} weeks`
 }
 
 /** Rolling average of weekly adherence (for the trend line). */

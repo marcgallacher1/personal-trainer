@@ -6,7 +6,7 @@ import { CalendarHeatmap } from '../../components/charts/CalendarHeatmap'
 import { ChartCard } from '../../components/charts/ChartCard'
 import { LineChart } from '../../components/charts/LineChart'
 import { shortDate } from '../../components/charts/scales'
-import { summariseAdherence, weeklyAdherence } from '../../lib/analysis/adherence'
+import { basisLabel, summariseAdherence, weeklyAdherence } from '../../lib/analysis/adherence'
 import { exerciseTrend, mostTrained, recentPbs, strengthSeries } from '../../lib/analysis/strength'
 import {
   addDays,
@@ -82,7 +82,9 @@ function FollowingCard({ data }: { data: TrainingData }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-lg font-bold">Following your plan</p>
-          <p className="truncate text-sm text-muted">{data.active.plan.name} · last 4 weeks</p>
+          <p className="truncate text-sm text-muted">
+            {data.active.plan.name} · {basisLabel(s.basis)}
+          </p>
         </div>
         <span className="text-2xl text-muted">›</span>
       </div>

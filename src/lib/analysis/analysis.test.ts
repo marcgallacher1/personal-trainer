@@ -4,6 +4,7 @@ import { generateSampleHistory, type SampleSession } from '../fixtures/sample'
 import {
   matchWorkout,
   rollingAdherence,
+  planStart,
   summariseAdherence,
   swapCredit,
   weeklyAdherence,
@@ -105,6 +106,7 @@ const pullDone = (id: string, date: string) =>
 const wk = (week: string, done: number, score: number) => ({
   week,
   planned: 3,
+  due: 3,
   done,
   score,
   sessions: [],
@@ -228,6 +230,42 @@ describe('weekly adherence', () => {
     expect(s.currentStreak).toBe(2)
     expect(s.longestStreak).toBe(2)
     expect(rollingAdherence(weeks, 2).map((r) => r.value)).toEqual([1, 0.65, 0.6, 0.95, 0.65])
+  })
+})
+
+describe('plan week 1', () => {
+  // Mon 2 Nov: Push (Mon) missed, Pull (Tue) done, Push again Thu still to come
+  const plan: PlannedWorkout[] = [
+    { ...push, perWeek: 2, days: [1, 4] },
+    { ...pull, days: [2] },
+  ]
+
+  it('starts on the Monday of your first workout, not when the plan was made', () => {
+    expect(planStart('2026-11-03', '2026-10-20')).toBe('2026-11-02')
+    // Made mid-week: from then
+    expect(planStart('2026-11-05', '2026-11-04')).toBe('2026-11-04')
+    expect(planStart(null, '2026-10-20')).toBe('2026-10-20')
+  })
+
+  it('counts only what was due so far this week, including a missed day', () => {
+    const weeks = weeklyAdherence(
+      plan,
+      [pullDone('b', '2026-11-03')],
+      info,
+      planStart('2026-11-03', '2026-10-20')!,
+      '2026-11-03',
+    )
+    expect(weeks).toHaveLength(1)
+    expect(weeks[0]).toMatchObject({ planned: 3, due: 2, done: 1 })
+    expect(weeks[0]!.score).toBe(0.5)
+    const s = summariseAdherence(weeks, '2026-11-03')
+    expect(s.score).toBe(0.5)
+    expect(s.basis).toEqual({ kind: 'this-week' })
+  })
+
+  it('switches to finished weeks once there are some', () => {
+    const s = summariseAdherence([wk('2026-10-26', 3, 1), wk('2026-11-02', 1, 0.3)], '2026-11-03')
+    expect(s.basis).toEqual({ kind: 'weeks', count: 1 })
   })
 })
 
