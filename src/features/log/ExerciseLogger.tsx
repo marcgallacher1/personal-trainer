@@ -96,6 +96,11 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
     isCompound: exercise?.is_compound ?? false,
     logType,
     resetKg: resetFor(planChanges, se.exercise_id, previous?.date ?? null),
+    workouts: new Set(
+      (history ?? [])
+        .filter((h) => !h.deleted_at && h.session_id !== se.session_id)
+        .map((h) => h.session_id),
+    ).size,
   })
 
   const nextInitial: EditorValue = {

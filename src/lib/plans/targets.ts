@@ -36,8 +36,10 @@ export function describeTarget(t: TargetLike, logType: LogType): string {
     if (r) parts.push(`${r} reps`)
   }
   if (t.set_type !== 'warmup') {
+    // Plain words: we don't know your exact failure point
     if (t.set_type === 'failure' || t.target_rir === 0) parts.push('to failure')
-    else if (t.target_rir !== null) parts.push(`RIR ${t.target_rir}`)
+    else if (t.target_rir !== null && t.target_rir <= 2) parts.push('near failure')
+    else if (t.target_rir !== null) parts.push(`${t.target_rir} in reserve`)
   }
   return parts.join(' · ') || 'Any'
 }

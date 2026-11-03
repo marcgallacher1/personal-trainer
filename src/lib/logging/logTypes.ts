@@ -110,7 +110,7 @@ export function headlineStats(
       const heaviest = maxBy(work, (s) => s.weight_kg)
       return [
         {
-          label: 'Best e1RM (kg)',
+          label: 'Est. 1-rep max (kg)',
           value: best ? n1(e1rm(best.weight_kg, best.reps)!) : dash,
           detail: best ? formatSet(best, t) : undefined,
         },

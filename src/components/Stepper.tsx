@@ -64,6 +64,8 @@ export function Stepper({
           autoFocus
           inputMode={decimals ? 'decimal' : format ? 'text' : 'numeric'}
           value={editing}
+          // Typing replaces what's there
+          onFocus={(e) => e.target.select()}
           onChange={(e) => setEditing(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && commit()}
@@ -73,7 +75,7 @@ export function Stepper({
         <button
           type="button"
           className="h-14 w-full min-w-0 text-center text-2xl font-semibold tabular-nums"
-          onClick={() => setEditing(value === 0 && emptyLabel ? '' : fmt(value))}
+          onClick={() => setEditing(value === 0 ? '' : fmt(value))}
         >
           {value === 0 && emptyLabel ? (
             <span className="text-muted">{emptyLabel}</span>

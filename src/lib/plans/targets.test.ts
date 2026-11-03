@@ -23,7 +23,7 @@ const t = (
 
 describe('describeTarget', () => {
   it('describes reps, RIR and set types', () => {
-    expect(describeTarget(t(8, 12, 1), 'weight_reps')).toBe('8–12 reps · RIR 1')
+    expect(describeTarget(t(8, 12, 1), 'weight_reps')).toBe('8–12 reps · near failure')
     expect(describeTarget(t(10, 15, 0), 'weight_reps')).toBe('10–15 reps · to failure')
     expect(describeTarget(t(10, 10, null, 'warmup'), 'weight_reps')).toBe('Warm-up · 10 reps')
     expect(describeTarget(t(null, null, null), 'weight_reps')).toBe('Any')
@@ -38,14 +38,14 @@ describe('describeTarget', () => {
 describe('describeTargets', () => {
   it('groups identical working sets and counts warm-ups', () => {
     expect(describeTargets([t(8, 12, 1), t(8, 12, 1), t(8, 12, 1)], 'weight_reps')).toBe(
-      '3 × 8–12 reps · RIR 1',
+      '3 × 8–12 reps · near failure',
     )
     expect(
       describeTargets(
         [t(10, 10, null, 'warmup'), t(6, 8, 1), t(10, 12, 0), t(10, 12, 0)],
         'weight_reps',
       ),
-    ).toBe('1 warm-up + 1 × 6–8 reps · RIR 1, 2 × 10–12 reps · to failure')
+    ).toBe('1 warm-up + 1 × 6–8 reps · near failure, 2 × 10–12 reps · to failure')
     expect(describeTargets([], 'weight_reps')).toBe('No sets planned')
   })
 })

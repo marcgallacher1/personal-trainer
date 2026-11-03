@@ -95,7 +95,7 @@ describe('detectPRs: timed', () => {
 describe('describePR', () => {
   it('formats each kind', () => {
     expect(describePR({ kind: 'e1rm', value: 119.1667, previous: 116.6667 })).toBe(
-      'New e1RM: 119.2 kg (was 116.7 kg)',
+      'Strongest yet: about 119.2 kg for 1 rep (was 116.7 kg)',
     )
     expect(describePR({ kind: 'weight', value: 102.5, previous: 100 })).toBe(
       'Heaviest ever: 102.5 kg',

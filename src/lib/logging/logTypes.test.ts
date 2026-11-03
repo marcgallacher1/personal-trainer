@@ -46,7 +46,7 @@ describe('headlineStats', () => {
   it('weight × reps: best e1RM and heaviest, ignoring warm-ups', () => {
     expect(headlineStats([w(100, 5), w(110, 1), w(140, 1, null, 'warmup')], 'weight_reps')).toEqual(
       [
-        { label: 'Best e1RM (kg)', value: '116.7', detail: '100 kg × 5' },
+        { label: 'Est. 1-rep max (kg)', value: '116.7', detail: '100 kg × 5' },
         { label: 'Heaviest (kg)', value: '110' },
       ],
     )

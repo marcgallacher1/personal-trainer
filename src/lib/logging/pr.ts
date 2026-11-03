@@ -81,7 +81,7 @@ export function formatSeconds(total: number): string {
 export function describePR(pr: PR): string {
   switch (pr.kind) {
     case 'e1rm':
-      return `New e1RM: ${kg(pr.value)} (was ${kg(pr.previous)})`
+      return `Strongest yet: about ${kg(pr.value)} for 1 rep (was ${kg(pr.previous)})`
     case 'weight':
       return `Heaviest ever: ${kg(pr.value)}`
     case 'best_at_load': {

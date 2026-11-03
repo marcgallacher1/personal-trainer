@@ -40,6 +40,7 @@ const target = (over: Partial<TargetInput>): TargetInput => ({
   targetRir: 2,
   isCompound: true,
   logType: 'weight_reps',
+  workouts: 5,
   ...over,
 })
 
@@ -89,6 +90,18 @@ describe("today's target", () => {
     expect(
       todaysTarget(target({ logType: 'bodyweight_reps', last: sets(3, 0, [10, 9, 9]) })),
     ).toMatchObject({ weightKg: null, reps: 10 })
+  })
+
+  it('suggests reps, not weights, until there are 3 workouts of data', () => {
+    const t = todaysTarget(target({ workouts: 2, last: sets(3, 60, 12) }))
+    expect(t).toMatchObject({ weightKg: null, heavier: false })
+    expect(describeTarget(t!)).toBe('8–12 reps near failure')
+  })
+
+  it('treats being under the range on bodyweight moves as building up', () => {
+    const t = todaysTarget(target({ logType: 'bodyweight_reps', last: sets(3, 0, [6, 5, 5]) }))
+    expect(describeTarget(t!)).toBe('6+ reps')
+    expect(t!.why).toMatch(/^Building up to 8–12 reps/)
   })
 
   it('uses an accepted reset weight', () => {

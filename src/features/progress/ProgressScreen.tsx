@@ -269,7 +269,7 @@ function Strength({ data }: { data: TrainingData }) {
         range={range}
         onRange={setRange}
         raw={{
-          columns: ['Date', 'Best set', 'e1RM', 'PB'],
+          columns: ['Date', 'Best set', 'Est. 1-rep max', 'PB'],
           rows: series
             .toReversed()
             .map((p) => [p.date, `${p.weightKg} kg × ${p.reps}`, p.e1rm, p.pb ? 'Yes' : '']),

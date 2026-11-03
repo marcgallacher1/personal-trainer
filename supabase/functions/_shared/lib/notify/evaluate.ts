@@ -352,7 +352,8 @@ export function dueNotifications(s: NotifyState): Due[] {
 export function rundownBody(w: NonNullable<NotifyState['rundown']>): string {
   const next = 'Tap for 3 things to do next week.'
   if (w.done === 0) return `No workouts this week. ${next}`
-  if (w.planned && w.done >= w.planned) return `${w.done} of ${w.planned} workouts, full week 💪 ${next}`
+  if (w.planned && w.done >= w.planned)
+    return `${w.done} of ${w.planned} workouts, full week 💪 ${next}`
   if (w.planned) return `${w.done} of ${w.planned} workouts this week. ${next}`
   return `${w.done} workout${w.done === 1 ? '' : 's'} this week. ${next}`
 }

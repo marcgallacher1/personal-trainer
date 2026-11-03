@@ -4,6 +4,9 @@
  */
 import { isTimed, type LogType } from '../logging/types'
 
+/** Weights are only suggested once a lift has this many workouts behind it. */
+export const WORKOUTS_BEFORE_WEIGHTS = 3
+
 /** Weight added once the top of the range is hit on every set. */
 export const INCREMENT = { compound: 2.5, isolation: 1 } as const
 
@@ -24,6 +27,8 @@ export interface TargetInput {
   logType: LogType
   /** A reset weight you accepted after a stall, if newer than the last workout */
   resetKg?: number | null
+  /** Workouts this lift has been done in before today */
+  workouts: number
 }
 
 export interface TodaysTarget {
@@ -34,12 +39,15 @@ export interface TodaysTarget {
   why: string
   /** True when the target adds weight */
   heavier: boolean
+  /** Shown instead of weight × reps, e.g. "8–12 reps" */
+  text?: string
 }
 
 const fmt = (n: number) => `${Math.round(n * 100) / 100}`
 
 /** Readable target, e.g. "62.5 kg × 8" or "10 reps". */
 export function describeTarget(t: TodaysTarget): string {
+  if (t.text) return t.text
   return t.weightKg === null ? `${t.reps} reps` : `${fmt(t.weightKg)} kg × ${t.reps}`
 }
 
@@ -59,6 +67,7 @@ export function todaysTarget(input: TargetInput): TodaysTarget | null {
     }
   }
   if (!working.length || !top || !bottom) return null
+  const range = bottom === top ? `${top} reps` : `${bottom}–${top} reps`
 
   const bodyweight = logType === 'bodyweight_reps'
   const assisted = logType === 'assisted_reps'
@@ -75,6 +84,15 @@ export function todaysTarget(input: TargetInput): TodaysTarget | null {
   const step = input.isCompound ? INCREMENT.compound : INCREMENT.isolation
 
   if (bodyweight || weight <= 0) {
+    // Under the range is fine while you build up: just beat last time
+    if (lowest < bottom)
+      return {
+        weightKg: null,
+        reps: lowest + 1,
+        text: `${lowest + 1}+ reps`,
+        why: `Building up to ${range}. Beat last time by a rep.`,
+        heavier: false,
+      }
     return allTop
       ? {
           weightKg: null,
@@ -88,6 +106,17 @@ export function todaysTarget(input: TargetInput): TodaysTarget | null {
           why: `Beat last time by a rep.`,
           heavier: false,
         }
+  }
+
+  // Too little data to suggest weights yet
+  if (input.workouts < WORKOUTS_BEFORE_WEIGHTS) {
+    return {
+      weightKg: null,
+      reps: top,
+      text: `${range} near failure`,
+      why: `Pick a weight you can do ${range} with. Weight tips start after ${WORKOUTS_BEFORE_WEIGHTS} workouts.`,
+      heavier: false,
+    }
   }
 
   if (allTop && !tooHard) {
