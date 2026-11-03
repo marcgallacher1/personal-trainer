@@ -10,6 +10,8 @@ import { londonToIso } from '../../lib/time/london'
 import { markApplied, todayExtras, usePlanChanges } from '../coach/data'
 import { addExercise, startSession, type PastTimes } from '../log/actions'
 import { londonDate } from '../log/format'
+import { suggestWorkout } from '../../lib/plans/suggest'
+import { useTrainingData } from '../progress/data'
 import { startFromPlan, usePlanLibrary } from './data'
 
 const SHORT_DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -23,6 +25,7 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
   const library = usePlanLibrary()
   const summaries = useSessionSummaries()
   const exercises = useExercises()
+  const training = useTrainingData()
   const extras = todayExtras(usePlanChanges())
   const [open, setOpen] = useState(false)
   const [now] = useState(() => new Date())
@@ -57,13 +60,32 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
   const foldsInto = (s: PlanSessionRow) => extras.folds.filter((f) => f.intoWorkoutId === s.id)
   const nameOf = (id: string) => exercises?.find((e) => e.id === id)?.name ?? 'Exercise'
   const plan = active?.versions ?? []
+  // Best workout for today: not done this week, muscles rested, missed ones first
+  const suggestion =
+    !past && training && active
+      ? suggestWorkout({
+          today: todayDate,
+          workouts: plan.map((s) => ({
+            id: s.id,
+            name: s.name,
+            days: daysOf(s),
+            exerciseIds: active.exercises
+              .filter((e) => e.plan_session_id === s.id)
+              .map((e) => e.exercise_id),
+          })),
+          sessions: training.sessions.map((s) => ({
+            date: s.date,
+            workoutId: s.planSessionId,
+            sets: s.sets,
+          })),
+          info: training.ctx.exercises,
+          muscleName: (id) => training.ctx.muscles.find((m) => m.id === id)?.name ?? id,
+        })
+      : null
+  const trainedToday = (training?.sessions ?? []).some((s) => s.date === todayDate)
   const todays = past
     ? []
-    : plan.filter(
-        (s) =>
-          (daysOf(s).includes(today) || movesOf(s).length > 0) &&
-          !doneOn.get(s.id)?.includes(today),
-      )
+    : plan.filter((s) => s.id === suggestion?.workoutId || movesOf(s).length > 0)
   const rest = plan.filter((s) => !todays.includes(s))
   const left = rest.filter((s) => timesLeft(s) > 0)
   const done = rest.filter((s) => timesLeft(s) <= 0)
@@ -101,9 +123,10 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
     })
   }
 
-  /** "Moved to today" / "+ Bench Press from Push" */
+  /** Why it's suggested, plus "Moved to today" / "+ Bench Press from Push" */
   const todayDetail = (s: PlanSessionRow) =>
     [
+      s.id === suggestion?.workoutId && suggestion.why,
       movesOf(s).length > 0 && 'Moved to today',
       ...foldsInto(s).map((f) => {
         const from = plan.find((v) => v.id === f.fromWorkoutId)?.name
@@ -128,7 +151,7 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
       </Button>
       {todays.length > 0 && (
         <p className="-mt-1 text-center text-sm text-muted">
-          Today on {active!.plan.name}:{' '}
+          {trainedToday ? 'Next up' : 'Suggested today'}:{' '}
           <b className="text-text">{todays.map((s) => s.name).join(' + ')}</b>
         </p>
       )}
@@ -175,7 +198,10 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
             </section>
           )}
 
-          <Group title={`Today · ${DAY_NAMES[today - 1]}`} items={todays}>
+          <Group
+            title={trainedToday ? 'Next up' : `Suggested today · ${DAY_NAMES[today - 1]}`}
+            items={todays}
+          >
             {(s) => (
               <WorkoutRow
                 key={s.id}
