@@ -149,19 +149,17 @@ export function LogScreen() {
             to={`/log/session/${session.id}`}
             className="block rounded-2xl bg-surface p-4 active:opacity-80"
           >
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="flex min-w-0 items-center gap-2 font-bold">
-                <span className="truncate">{sessionTitle(session)}</span>
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate font-bold">{sessionTitle(session)}</p>
+              <span className="flex shrink-0 items-center gap-2 text-xs text-muted">
+                {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(
+                  new Date(session.started_at),
+                )}
                 {(() => {
                   const r = reviews?.(session.id)
                   return r ? <ScorePill score={r.score} /> : null
                 })()}
-              </p>
-              <p className="shrink-0 text-xs text-muted">
-                {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(
-                  new Date(session.started_at),
-                )}
-              </p>
+              </span>
             </div>
             <p className="text-sm text-muted">
               {session.ended_at

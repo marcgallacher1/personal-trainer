@@ -83,11 +83,12 @@ describe('workout review', () => {
   it('points out drops, skipped plan exercises and easy sets, briefly', () => {
     const now = workout('b', '2026-11-03', [['Barbell Bench Press', 3, 50, 8, 4]], 120)
     const r = reviewWorkout({ session: now, history: [last, now], info, planned: PUSH })!
-    expect(r.score).toBeLessThan(55)
+    expect(r.score).toBe(100 - 8 - 8 - 8 - 5)
     expect(r.improve).toEqual([
-      'Down on Barbell Bench Press. Rest more, or check sleep and food.',
+      'Down on Barbell Bench Press vs last time. Rest longer between sets, or check sleep and food.',
       'Skipped Cable Lateral Raise from the plan.',
       'Most sets had 3+ reps left. Push a bit closer to failure.',
+      'Long session (120 min). Shorter rests or fewer extras keep quality up.',
     ])
     for (const b of [...r.good, ...r.improve]) expect(b.length).toBeLessThan(110)
   })
@@ -103,8 +104,22 @@ describe('workout review', () => {
   it('flags too many sets for one muscle in one session', () => {
     const b = workout('b', '2026-11-03', [['Barbell Bench Press', 13, 60, 8]])
     expect(reviewWorkout({ session: b, history: [b], info, planned: null })!.improve[0]).toMatch(
-      /over 12 sets/,
+      /Over 12 sets/,
     )
+  })
+
+  it('never takes points off without saying why', () => {
+    // First time on everything, nothing wrong: full marks
+    const first = workout('b', '2026-11-03', [['Barbell Bench Press', 3, 60, 8]])
+    const r = reviewWorkout({ session: first, history: [first], info, planned: null })!
+    expect(r).toMatchObject({ score: 100, improve: [] })
+    // Matching last time costs a little, and says so
+    const again = workout('c', '2026-11-10', [['Barbell Bench Press', 3, 60, 8]])
+    const r2 = reviewWorkout({ session: again, history: [first, again], info, planned: null })!
+    expect(r2.score).toBe(96)
+    expect(r2.improve).toEqual([
+      'Same as last time on Barbell Bench Press. Add a rep or a little weight next time.',
+    ])
   })
 
   it('has nothing to say about an empty workout', () => {

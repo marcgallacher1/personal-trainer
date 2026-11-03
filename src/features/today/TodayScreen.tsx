@@ -8,6 +8,7 @@ import { isoWeek } from '../../lib/time/london'
 import { formatDuration, londonDate, sessionTitle } from '../log/format'
 import { SuggestionCard } from '../coach/SuggestionCard'
 import { useProfile } from '../plans/data'
+import { ScorePill, useReviews } from '../review/ReviewBadge'
 import { LogWorkoutButton } from '../plans/LogWorkoutButton'
 import { WEEKDAYS } from '../plans/WeekdayPicker'
 
@@ -26,6 +27,8 @@ export function TodayScreen() {
   }))
   const week = weekProgress(workouts, today, profile?.sessions_per_week ?? 4)
   const last = summaries?.find((s) => s.session.ended_at !== null)
+  const reviews = useReviews()
+  const lastReview = last ? reviews?.(last.session.id) : null
   const heading = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -63,8 +66,15 @@ export function TodayScreen() {
 
         {last && (
           <Link to={`/log/session/${last.session.id}`} className="block rounded-2xl bg-surface p-4">
-            <p className="text-xs font-semibold tracking-wide text-muted uppercase">Last workout</p>
-            <p className="mt-1 font-bold">{sessionTitle(last.session)}</p>
+            <div className="flex items-start justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold tracking-wide text-muted uppercase">
+                  Last workout
+                </span>
+                <span className="mt-1 block truncate font-bold">{sessionTitle(last.session)}</span>
+              </span>
+              {lastReview && <ScorePill score={lastReview.score} large />}
+            </div>
             <p className="text-sm text-muted">
               {new Intl.DateTimeFormat('en-GB', {
                 weekday: 'short',

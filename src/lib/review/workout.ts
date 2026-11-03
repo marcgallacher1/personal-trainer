@@ -1,5 +1,5 @@
 /**
- * A quick review of one workout: a score out of 100 and a few short bullets.
+ * A quick review of one workout: starts at 100, and every point off has a "Next time" bullet.
  * Worked out when you open it (nothing is stored), from the workout and your earlier ones.
  */
 import { matchWorkout, type PlannedWorkout } from '../analysis/adherence'
@@ -58,13 +58,14 @@ export function reviewWorkout(input: ReviewInput): WorkoutReview | null {
   const earlier = history.filter((s) => s.startedAt < session.startedAt)
 
   const good: string[] = []
-  const improve: string[] = []
-  let score = 60
+  // Every point off comes with a reason
+  const improve: { text: string; cost: number }[] = []
+  const take = (cost: number, text: string) => improve.push({ text, cost: Math.round(cost) })
 
   // Each exercise vs the last time you did it
   const up: string[] = []
+  const same: string[] = []
   const down: string[] = []
-  let compared = 0
   for (const { exerciseId } of setsByExercise(session)) {
     const now = best(session.sets.filter((s) => s.exerciseId === exerciseId))
     const prev = earlier
@@ -72,26 +73,36 @@ export function reviewWorkout(input: ReviewInput): WorkoutReview | null {
       .map((s) => best(s.sets.filter((x) => x.exerciseId === exerciseId)))
       .find(Boolean)
     if (!now || !prev || now.byReps !== prev.byReps) continue
-    compared++
     if (now.value > prev.value * 1.005) up.push(name(exerciseId))
     else if (now.value < prev.value * 0.95) down.push(name(exerciseId))
+    else same.push(name(exerciseId))
   }
-  if (compared) {
-    score += Math.round((up.length / compared) * 25) - Math.min(10, down.length * 5)
-    if (up.length) good.push(`Beat last time on ${listShort(up)}.`)
-    else if (!down.length) good.push('Matched last time on everything. Add a rep next time.')
-    if (down.length) improve.push(`Down on ${listShort(down)}. Rest more, or check sleep and food.`)
-  } else {
-    good.push('First time logging these. Next time has something to beat.')
-  }
+  const compared = up.length + same.length + down.length
+  if (up.length) good.push(`Beat last time on ${listShort(up)}.`)
+  if (!compared) good.push('First time logging these. Next time has something to beat.')
+  if (down.length)
+    take(
+      Math.min(20, down.length * 8),
+      `Down on ${listShort(down)} vs last time. Rest longer between sets, or check sleep and food.`,
+    )
+  if (same.length)
+    take(
+      Math.min(12, same.length * 4),
+      `Same as last time on ${listShort(same)}. Add a rep or a little weight next time.`,
+    )
 
   // Did you do what the plan said?
   if (planned) {
     const match = matchWorkout(planned, setsByExercise(session), info)
-    score += Math.round((match.score - 0.7) * 30)
     const skipped = match.exercises.filter((e) => e.score === 0).map((e) => name(e.plannedId))
-    if (match.score >= 0.9) good.push('Did the full plan.')
-    else if (skipped.length) improve.push(`Skipped ${listShort(skipped)} from the plan.`)
+    const short = match.exercises
+      .filter((e) => e.score > 0 && e.setsDone < e.setsPlanned)
+      .map((e) => name(e.plannedId))
+    if (match.score >= 0.95) good.push('Did the full plan.')
+    if (skipped.length)
+      take(Math.min(25, skipped.length * 8), `Skipped ${listShort(skipped)} from the plan.`)
+    if (short.length)
+      take(Math.min(10, short.length * 3), `Fewer sets than planned on ${listShort(short)}.`)
   }
 
   // Too many sets for one muscle in one go
@@ -101,44 +112,39 @@ export function reviewWorkout(input: ReviewInput): WorkoutReview | null {
       if (m.weight >= 1) perMuscle.set(m.muscleId, (perMuscle.get(m.muscleId) ?? 0) + 1)
     }
   }
-  const heavy = [...perMuscle].filter(([, n]) => n > PER_SESSION_MAX)
-  if (heavy.length) {
-    score -= 8
-    improve.push(
-      `${heavy.length === 1 ? 'One muscle' : 'Some muscles'} got over ${PER_SESSION_MAX} sets. Extra sets past that add little; spread them across the week.`,
+  if ([...perMuscle.values()].some((n) => n > PER_SESSION_MAX))
+    take(
+      8,
+      `Over ${PER_SESSION_MAX} sets for one muscle. Sets past that add little; spread them across the week.`,
     )
-  }
 
   // Effort, if you logged reps in reserve
   const rirs = working.flatMap((s) => (s.rir === null ? [] : [s.rir]))
   if (rirs.length >= 3) {
     const avg = rirs.reduce((a, b) => a + b, 0) / rirs.length
-    if (avg <= 2) {
-      score += 5
-      good.push('Worked close to failure.')
-    } else if (avg >= 3) {
-      score -= 5
-      improve.push('Most sets had 3+ reps left. Push a bit closer to failure.')
-    }
+    if (avg <= 2) good.push('Worked close to failure.')
+    else if (avg >= 3) take(8, 'Most sets had 3+ reps left. Push a bit closer to failure.')
   }
 
   // Length
   const minutes = session.endedAt
     ? (Date.parse(session.endedAt) - Date.parse(session.startedAt)) / 60_000
     : null
-  if (minutes !== null && minutes > 0 && minutes < 300) {
-    if (minutes > 105)
-      improve.push(
-        `Long session (${Math.round(minutes)} min). Shorter rests or fewer extras keep quality up.`,
-      )
-  }
+  if (minutes !== null && minutes > 105 && minutes < 300)
+    take(
+      5,
+      `Long session (${Math.round(minutes)} min). Shorter rests or fewer extras keep quality up.`,
+    )
 
+  let score = 100 - improve.reduce((a, x) => a + x.cost, 0)
   score = Math.max(0, Math.min(100, score))
   return {
     score,
     verdict: verdictForWorkout(score),
     good: good.slice(0, MAX_BULLETS),
-    improve: improve.slice(0, MAX_BULLETS),
+    // Biggest reasons first
+    // All of them, so every point off is explained
+    improve: improve.toSorted((a, b) => b.cost - a.cost).map((x) => x.text),
   }
 }
 

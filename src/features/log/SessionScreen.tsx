@@ -29,7 +29,7 @@ import { CardioLogger } from './CardioLogger'
 import { asLogType, formatSet } from '../../lib/logging/logTypes'
 import { asLoadMode, type LoadMode, type LogType } from '../../lib/logging/types'
 import { ExerciseLogger } from './ExerciseLogger'
-import { ReviewButton, useReviews } from '../review/ReviewBadge'
+import { ReviewCard, useReviews } from '../review/ReviewBadge'
 import { formatDuration, sessionTitle } from './format'
 
 /** Workout overview: one summary card per exercise; tap a card to log it in a full-screen modal. */
@@ -158,6 +158,8 @@ export function SessionScreen() {
         </p>
       </div>
 
+      {review && <ReviewCard review={review} />}
+
       {list.length === 0 && cardioList.length === 0 && (
         <p className="rounded-2xl bg-surface p-6 text-center text-muted">
           Add your first exercise to get started.
@@ -268,7 +270,7 @@ export function SessionScreen() {
               message: `Workout saved · ${workingSets.length} sets`,
               action: {
                 label: 'See rating',
-                onClick: () => void navigate(`/log/session/${session.id}?review=1`),
+                onClick: () => void navigate(`/log/session/${session.id}`),
               },
             })
             void navigate('/', { replace: true })
@@ -277,8 +279,7 @@ export function SessionScreen() {
           Save workout
         </Button>
       ) : (
-        <div className="flex flex-col items-center gap-2">
-          {review && <ReviewButton review={review} defaultOpen={params.get('review') === '1'} />}
+        <div>
           <p className="text-center text-sm text-muted">
             Saved{' '}
             {new Date(session.ended_at!).toLocaleString('en-GB', {
