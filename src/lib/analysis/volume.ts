@@ -1,5 +1,5 @@
 /** Sets per muscle (secondary muscles count half), tonnage and sets per day. */
-import { isWorking, weekOf, type ExerciseInfo, type TrainingSession } from './training'
+import { isWorking, tonnageOf, weekOf, type ExerciseInfo, type TrainingSession } from './training'
 
 /** Muscle groups for stacked charts, in display order. */
 export const MUSCLE_GROUPS = [
@@ -71,7 +71,7 @@ export function weeklyVolume(
       for (const set of s.sets) {
         if (!isWorking(set)) continue
         sets++
-        tonnage += Math.max(0, set.weightKg) * Math.max(0, set.reps)
+        tonnage += tonnageOf(set)
       }
     }
     return { week, groups, sets, tonnage: Math.round(tonnage) }

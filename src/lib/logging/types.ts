@@ -23,6 +23,20 @@ export const LOG_TYPES: readonly LogType[] = [
   'weight_duration',
 ]
 
+/** What the weight means. */
+export type LoadMode =
+  /** The whole load, e.g. 60 kg on the bar (bar included) */
+  | 'total'
+  /** Each of two dumbbells or handles: 20 kg = two 20s */
+  | 'per_hand'
+  /** Single-arm/leg: left in weight_kg/reps, right in right_weight_kg/right_reps */
+  | 'per_side'
+
+export const LOAD_MODES: readonly LoadMode[] = ['total', 'per_hand', 'per_side']
+
+export const asLoadMode = (v: string | null | undefined): LoadMode =>
+  (LOAD_MODES as readonly string[]).includes(v ?? '') ? (v as LoadMode) : 'total'
+
 export const isTimed = (t: LogType): boolean => t === 'duration' || t === 'weight_duration'
 
 /** The subset of a logged set the pure logging functions need. */
@@ -37,6 +51,9 @@ export interface LoggedSet {
   set_type: SetType
   completed_at: string
   deleted_at: string | null
+  /** Right side, for single-arm/leg moves */
+  right_weight_kg?: number | null
+  right_reps?: number | null
 }
 
 /** An unlogged, editable set row. */
@@ -45,4 +62,6 @@ export interface DraftSet {
   reps: number
   duration_seconds: number | null
   set_type: SetType
+  right_weight_kg?: number | null
+  right_reps?: number | null
 }

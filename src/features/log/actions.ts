@@ -2,12 +2,19 @@ import type { CardioEntry, Exercise, Session, SessionExercise, SetRow } from '..
 import { db } from '../../db/local'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, restoration, save, saveOne, type Change } from '../../db/write'
+import { bestSide } from '../../lib/logging/load'
 import { detectPRs, type PR } from '../../lib/logging/pr'
 import type { DraftSet, LogType } from '../../lib/logging/types'
 
 const live = <T extends { deleted_at: string | null }>(r: T) => r.deleted_at === null
 
-export async function startSession(): Promise<string> {
+/** For a workout logged afterwards: when it started and finished. */
+export interface PastTimes {
+  startedAt: string
+  endedAt: string
+}
+
+export async function startSession(past?: PastTimes): Promise<string> {
   const now = nowIso()
   const session: Session = {
     id: newId(),
@@ -15,8 +22,8 @@ export async function startSession(): Promise<string> {
     plan_id: null,
     plan_session_id: null,
     name: null,
-    started_at: now,
-    ended_at: null,
+    started_at: past?.startedAt ?? now,
+    ended_at: past?.endedAt ?? null,
     notes: null,
     created_at: now,
     updated_at: now,
@@ -110,6 +117,12 @@ export async function moveSessionExercise(
   ])
 }
 
+/** Single-arm moves: PBs go by the stronger side. */
+const strongest = <T extends Pick<DraftSet, 'weight_kg' | 'reps'>>(s: T): T => {
+  const b = bestSide(s)
+  return { ...s, weight_kg: b.weightKg, reps: b.reps }
+}
+
 /** Logs a set; returns its id and any PRs it sets (vs. every earlier set of that exercise). */
 export async function logSet(
   se: SessionExercise,
@@ -118,13 +131,28 @@ export async function logSet(
   logType: LogType = 'weight_reps',
   planSetTargetId: string | null = null,
 ): Promise<{ id: string; prs: PR[] }> {
-  const [history, today] = await Promise.all([
+  const [history, today, session] = await Promise.all([
     db.sets.where('exercise_id').equals(se.exercise_id).toArray(),
     db.sets.where('session_id').equals(se.session_id).toArray(),
+    db.sessions.get(se.session_id),
   ])
-  const prs = detectPRs(draft, history.filter(live) as Parameters<typeof detectPRs>[1], logType)
+  const prs = detectPRs(
+    strongest(draft),
+    history.filter(live).map(strongest) as Parameters<typeof detectPRs>[1],
+    logType,
+  )
   const mine = today.filter((s) => live(s) && s.session_exercise_id === se.id)
   const now = nowIso()
+  // A workout logged afterwards: space its sets through the workout, not "now"
+  const completedAt =
+    session?.ended_at && session.ended_at < now
+      ? new Date(
+          Math.min(
+            Date.parse(session.ended_at),
+            Date.parse(session.started_at) + (today.filter(live).length + 1) * 150_000,
+          ),
+        ).toISOString()
+      : now
   const row: SetRow = {
     id: newId(),
     user_id: requireUserId(),
@@ -135,12 +163,14 @@ export async function logSet(
     order: Math.max(-1, ...mine.map((s) => s.order)) + 1,
     weight_kg: draft.weight_kg,
     reps: draft.reps,
+    right_weight_kg: draft.right_weight_kg ?? null,
+    right_reps: draft.right_reps ?? null,
     duration_seconds: draft.duration_seconds,
     rpe: null,
     rir,
     set_type: draft.set_type,
     is_pr: prs.length > 0,
-    completed_at: now,
+    completed_at: completedAt,
     created_at: now,
     updated_at: now,
     deleted_at: null,

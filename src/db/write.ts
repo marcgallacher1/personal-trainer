@@ -60,3 +60,13 @@ export function deletion(table: SyncedTable, row: Row): Change {
 export function restoration(table: SyncedTable, row: Row): Change {
   return { table, row: { ...row, deleted_at: null } }
 }
+
+/** Saves a new order for rows (only the ones whose position changed). */
+export async function saveOrder(
+  table: SyncedTable,
+  rows: readonly (Row & { order: number })[],
+): Promise<void> {
+  await save(
+    rows.flatMap((row, i) => (row.order === i ? [] : [{ table, row: { ...row, order: i } }])),
+  )
+}

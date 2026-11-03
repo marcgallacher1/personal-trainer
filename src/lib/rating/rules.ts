@@ -78,7 +78,7 @@ export const SUGGEST_FOR_MUSCLE: Readonly<Record<string, readonly string[]>> = {
   upper_back: ['Chest-Supported Dumbbell Row', 'Seated Cable Row', 'Dumbbell Shrug'],
   lower_back: ['Back Extension'],
   biceps: ['Incline Dumbbell Curl', 'Bayesian Cable Curl', 'Hammer Curl'],
-  triceps: ['Overhead Cable Triceps Extension', 'Triceps Pushdown', 'Skull Crusher'],
+  triceps: ['Overhead Cable Triceps Extension', 'Straight-Bar Pushdown', 'Skull Crusher'],
   forearms: ['Hammer Curl', 'Wrist Curl'],
   abs: ['Cable Crunch', 'Hanging Knee Raise', 'Ab Wheel Rollout'],
   obliques: ['Pallof Press', 'Cable Woodchop'],

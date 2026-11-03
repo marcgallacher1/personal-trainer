@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { cardioTotals } from '../lib/cardio'
 import type { LoggedSet } from '../lib/logging/types'
 import type { Tables } from './database.types'
+import { setTonnage } from '../lib/logging/load'
+import { asLoadMode } from '../lib/logging/types'
 import { db } from './local'
 
 export type Session = Tables<'sessions'>
@@ -137,11 +139,13 @@ function groupBySession<T extends { session_id: string; deleted_at: string | nul
 
 export function useSessionSummaries(): SessionSummary[] | undefined {
   return useLiveQuery(async () => {
-    const [sessions, sets, cardio] = await Promise.all([
+    const [sessions, sets, cardio, exercises] = await Promise.all([
       db.sessions.toArray(),
       db.sets.toArray(),
       db.cardio_entries.toArray(),
+      db.exercises.toArray(),
     ])
+    const modeOf = new Map(exercises.map((e) => [e.id, asLoadMode(e.load_mode)]))
     const setsBySession = groupBySession(sets)
     const cardioBySession = groupBySession(cardio)
     return sessions
@@ -156,7 +160,7 @@ export function useSessionSummaries(): SessionSummary[] | undefined {
           setCount: ss.filter((s) => s.set_type !== 'warmup').length,
           volume: ss
             .filter((s) => s.set_type !== 'warmup')
-            .reduce((v, s) => v + s.weight_kg * s.reps, 0),
+            .reduce((v, s) => v + setTonnage(s, modeOf.get(s.exercise_id) ?? 'total'), 0),
           exerciseIds: [...new Set(ss.map((s) => s.exercise_id))],
           cardio: { ...totals, activities: [...new Set(cc.map((c) => c.activity))] },
         }

@@ -77,6 +77,7 @@ describe('offline log → push → wipe → pull', () => {
       equipment: 'cable',
       pattern: 'isolation',
       logType: 'weight_reps',
+      loadMode: 'total',
       muscles: { biceps: 'primary', forearms: 'secondary' },
     })
 

@@ -1,6 +1,6 @@
 import { e1rm } from '../analysis/e1rm'
 import { formatSeconds } from './pr'
-import type { LogType } from './types'
+import type { LoadMode, LogType } from './types'
 
 export const LOG_TYPE_INFO: Record<LogType, { name: string; description: string }> = {
   weight_reps: { name: 'Weight × reps', description: 'e.g. bench press, curls' },
@@ -22,14 +22,21 @@ interface SetLike {
   weight_kg: number
   reps: number
   duration_seconds: number | null
+  right_weight_kg?: number | null
+  right_reps?: number | null
 }
 
+const hasRight = (s: SetLike) => s.right_reps !== null && s.right_reps !== undefined
+
 /** The "load" column: what you lifted / added / were assisted by. */
-export function formatLoad(s: SetLike, t: LogType): string {
+export function formatLoad(s: SetLike, t: LogType, mode: LoadMode = 'total'): string {
   switch (t) {
     case 'weight_reps':
-    case 'weight_duration':
-      return `${n(s.weight_kg)} kg`
+    case 'weight_duration': {
+      if (hasRight(s) && Number(s.right_weight_kg ?? s.weight_kg) !== Number(s.weight_kg))
+        return `${n(s.weight_kg)} / ${n(Number(s.right_weight_kg))} kg`
+      return `${n(s.weight_kg)} kg${mode === 'per_hand' ? ' each' : ''}`
+    }
     case 'bodyweight_reps':
     case 'duration':
       return s.weight_kg > 0 ? `BW +${n(s.weight_kg)} kg` : 'BW'
@@ -40,19 +47,18 @@ export function formatLoad(s: SetLike, t: LogType): string {
 
 /** The "effort" column: reps or time. */
 export function formatEffort(s: SetLike, t: LogType): string {
-  return t === 'duration' || t === 'weight_duration'
-    ? formatSeconds(s.duration_seconds ?? 0)
-    : `${s.reps}`
+  if (t === 'duration' || t === 'weight_duration') return formatSeconds(s.duration_seconds ?? 0)
+  return hasRight(s) ? `L${s.reps} R${s.right_reps}` : `${s.reps}`
 }
 
 /** One set as text, e.g. "80 kg × 8" or "45 s". */
-export function formatSet(s: SetLike, t: LogType): string {
+export function formatSet(s: SetLike, t: LogType, mode: LoadMode = 'total'): string {
   if (t === 'duration') {
     return s.weight_kg > 0
       ? `${formatSeconds(s.duration_seconds ?? 0)} (+${n(s.weight_kg)} kg)`
       : formatSeconds(s.duration_seconds ?? 0)
   }
-  return `${formatLoad(s, t)} × ${formatEffort(s, t)}`
+  return `${formatLoad(s, t, mode)} × ${formatEffort(s, t)}`
 }
 
 /** Column headings for the logged-sets table. */

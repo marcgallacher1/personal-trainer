@@ -6,6 +6,7 @@ import { Confirm } from '../../components/Confirm'
 import { showToast } from '../../components/Toast'
 import { useExercise, useExerciseHistory, useExerciseMuscleMap, useMuscles } from '../../db/queries'
 import { asLogType, formatSet, headlineStats, LOG_TYPE_INFO } from '../../lib/logging/logTypes'
+import { asLoadMode } from '../../lib/logging/types'
 import { EQUIPMENT_LABELS, label, PATTERN_LABELS } from '../../lib/seed/labels'
 import { deleteCustomExercise } from './actions'
 
@@ -104,7 +105,7 @@ export function ExerciseDetailScreen() {
                   <span className="truncate text-sm tabular-nums">
                     {[...ss]
                       .toSorted((a, b) => a.order - b.order)
-                      .map((s) => formatSet(s, logType))
+                      .map((s) => formatSet(s, logType, asLoadMode(exercise.load_mode)))
                       .join(' · ')}
                   </span>
                 </Link>

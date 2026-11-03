@@ -5,12 +5,18 @@ import { PageTitle } from '../../app/Layout'
 import { Button } from '../../components/Button'
 import { useExercise, useExerciseMuscleMap, useMuscles, type Exercise } from '../../db/queries'
 import { asLogType, LOG_TYPE_INFO } from '../../lib/logging/logTypes'
-import { LOG_TYPES } from '../../lib/logging/types'
+import { asLoadMode, LOG_TYPES, type LoadMode } from '../../lib/logging/types'
 import type { Equipment, MovementPattern } from '../../lib/seed/exercises'
 import { EQUIPMENT_LABELS, PATTERN_LABELS } from '../../lib/seed/labels'
 import { addExercise } from '../log/actions'
 import { saveCustomExercise, type ExerciseInput, type MuscleRole } from './actions'
 import { Chip } from './ExerciseList'
+
+const LOAD_MODE_OPTIONS: { id: LoadMode; label: string }[] = [
+  { id: 'total', label: 'The total' },
+  { id: 'per_hand', label: 'Each dumbbell / handle' },
+  { id: 'per_side', label: 'Each arm (log L and R)' },
+]
 
 /** /exercises/new (optionally ?addTo=<sessionId>) and /exercises/:id/edit */
 export function ExerciseFormScreen() {
@@ -29,6 +35,7 @@ export function ExerciseFormScreen() {
         equipment: existing.equipment as Equipment,
         pattern: existing.pattern as MovementPattern,
         logType: asLogType(existing.log_type),
+        loadMode: asLoadMode(existing.load_mode),
         muscles: Object.fromEntries(
           (muscleMap?.get(existing.id) ?? []).map((m) => [
             m.muscle_id,
@@ -36,7 +43,14 @@ export function ExerciseFormScreen() {
           ]),
         ),
       }
-    : { name: '', equipment: 'machine', pattern: 'isolation', logType: 'weight_reps', muscles: {} }
+    : {
+        name: '',
+        equipment: 'machine',
+        pattern: 'isolation',
+        logType: 'weight_reps',
+        loadMode: 'total',
+        muscles: {},
+      }
 
   return <Form key={existing?.id ?? 'new'} initial={initial} existing={existing ?? undefined} />
 }
@@ -134,6 +148,20 @@ function Form({ initial, existing }: { initial: ExerciseInput; existing?: Exerci
           ))}
         </div>
       </Field>
+
+      {(v.logType === 'weight_reps' || v.logType === 'weight_duration') && (
+        <Field title="The weight you enter is">
+          {LOAD_MODE_OPTIONS.map((o) => (
+            <Chip
+              key={o.id}
+              active={v.loadMode === o.id}
+              onClick={() => setV({ ...v, loadMode: o.id })}
+            >
+              {o.label}
+            </Chip>
+          ))}
+        </Field>
+      )}
 
       <Field
         title="Muscles"

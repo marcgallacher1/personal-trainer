@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/local'
 import type { PlannedWorkout } from '../../lib/analysis/adherence'
 import { actualMuscles } from '../../lib/analysis/muscles'
+import { bestSide, setTonnage } from '../../lib/logging/load'
+import { asLoadMode } from '../../lib/logging/types'
 import type { TrainingSession } from '../../lib/analysis/training'
 import { planWorkouts } from '../../lib/rating/inputs'
 import type { MuscleVolume } from '../../lib/rating/rate'
@@ -27,15 +29,23 @@ export function useTrainingData(): TrainingData | undefined {
   const ctx = useRatingContext()
   const library = usePlanLibrary()
   const logged = useLiveQuery(async () => {
-    const [sessions, sets] = await Promise.all([db.sessions.toArray(), db.sets.toArray()])
+    const [sessions, sets, exercises] = await Promise.all([
+      db.sessions.toArray(),
+      db.sets.toArray(),
+      db.exercises.toArray(),
+    ])
+    const modeOf = new Map(exercises.map((e) => [e.id, asLoadMode(e.load_mode)]))
     const bySession = new Map<string, TrainingSession['sets']>()
     for (const s of sets) {
       if (!live(s)) continue
       const list = bySession.get(s.session_id) ?? []
+      // Single-arm sets count as the stronger side
+      const best = bestSide(s)
       list.push({
         exerciseId: s.exercise_id,
-        weightKg: Number(s.weight_kg),
-        reps: s.reps,
+        weightKg: best.weightKg,
+        reps: best.reps,
+        tonnageKg: setTonnage(s, modeOf.get(s.exercise_id) ?? 'total'),
         seconds: s.duration_seconds,
         setType: s.set_type,
         rir: s.rir,

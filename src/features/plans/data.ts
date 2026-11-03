@@ -539,7 +539,10 @@ export async function restoreVersion(v: PlanVersionRow): Promise<void> {
 // --- Workouts from plans, and edits made during a workout ---
 
 /** Starts a workout pre-loaded with a planned workout's exercises (sets stay blank). */
-export async function startFromPlan(planSession: PlanSessionRow): Promise<string> {
+export async function startFromPlan(
+  planSession: PlanSessionRow,
+  past?: { startedAt: string; endedAt: string },
+): Promise<string> {
   const c = ctx()
   const exercises = (
     await db.plan_exercises.where('plan_session_id').equals(planSession.id).toArray()
@@ -552,8 +555,8 @@ export async function startFromPlan(planSession: PlanSessionRow): Promise<string
     plan_id: planSession.plan_id,
     plan_session_id: planSession.id,
     name: planSession.name,
-    started_at: c.now,
-    ended_at: null,
+    started_at: past?.startedAt ?? c.now,
+    ended_at: past?.endedAt ?? null,
     notes: null,
     created_at: c.now,
     updated_at: c.now,

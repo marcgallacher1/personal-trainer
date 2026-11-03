@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { Stepper } from '../../components/Stepper'
 import { formatSeconds } from '../../lib/logging/pr'
 import { REP_STEP, RIR_EXPLAINER, RIR_OPTIONS, WEIGHT_STEP_KG } from '../../lib/logging/settings'
-import { isTimed, type DraftSet, type LogType, type SetType } from '../../lib/logging/types'
+import {
+  isTimed,
+  type DraftSet,
+  type LoadMode,
+  type LogType,
+  type SetType,
+} from '../../lib/logging/types'
 
 export const SET_TYPE_INFO: Record<
   SetType,
@@ -43,6 +49,8 @@ export interface EditorValue extends DraftSet {
 
 interface Props {
   logType: LogType
+  /** Each dumbbell, or left and right logged apart */
+  loadMode?: LoadMode
   initial: EditorValue
   heading: string
   /** Plan target for this set, shown under the heading */
@@ -59,6 +67,7 @@ interface Props {
 /** Roomy, labelled editor for one set. Fields adapt to how the exercise is logged. */
 export function SetEditor({
   logType,
+  loadMode = 'total',
   initial,
   heading,
   target,
@@ -71,10 +80,34 @@ export function SetEditor({
 }: Props) {
   const timed = isTimed(logType)
   const optionalLoad = logType === 'bodyweight_reps' || logType === 'duration'
-  const [v, setV] = useState<EditorValue>(initial)
+  const sided = loadMode === 'per_side' && logType === 'weight_reps'
+  const [v, setV] = useState<EditorValue>(() =>
+    sided
+      ? {
+          ...initial,
+          right_weight_kg: initial.right_weight_kg ?? initial.weight_kg,
+          right_reps: initial.right_reps ?? initial.reps,
+        }
+      : initial,
+  )
+  // Right follows left until you change it
+  const [rightTouched, setRightTouched] = useState(initial.right_reps != null)
+  const setLeft = (patch: Partial<EditorValue>) =>
+    setV((cur) => ({
+      ...cur,
+      ...patch,
+      ...(!rightTouched && {
+        right_weight_kg: patch.weight_kg ?? cur.right_weight_kg,
+        right_reps: patch.reps ?? cur.right_reps,
+      }),
+    }))
+  const setRight = (patch: Partial<EditorValue>) => {
+    setRightTouched(true)
+    setV((cur) => ({ ...cur, ...patch }))
+  }
   const [showAdded, setShowAdded] = useState(initial.weight_kg > 0)
   const seconds = v.duration_seconds ?? 0
-  const invalid = timed ? seconds <= 0 : v.reps <= 0
+  const invalid = timed ? seconds <= 0 : v.reps <= 0 || (sided && (v.right_reps ?? 0) <= 0)
 
   /** Normalise before saving: timed sets have no reps; rep sets have no time; no RIR on holds. */
   const finalValue = (): EditorValue => ({
@@ -83,6 +116,8 @@ export function SetEditor({
     reps: timed ? 0 : v.reps,
     duration_seconds: timed ? seconds : null,
     rir: timed ? null : v.rir,
+    right_weight_kg: sided ? (v.right_weight_kg ?? v.weight_kg) : null,
+    right_reps: sided ? (v.right_reps ?? 0) : null,
   })
 
   const weightStepper = (label: string) => (
@@ -109,9 +144,42 @@ export function SetEditor({
         )}
       </div>
 
-      <div className="flex flex-col gap-4">
+      {sided && (
+        <div className="grid grid-cols-2 gap-2">
+          {(['L', 'R'] as const).map((side) => {
+            const left = side === 'L'
+            const set = left ? setLeft : setRight
+            return (
+              <div key={side} className="flex flex-col gap-2">
+                <p className="text-center text-xs font-semibold tracking-wide text-muted uppercase">
+                  {left ? 'Left' : 'Right'}
+                </p>
+                <Stepper
+                  label={`${left ? 'left' : 'right'} weight`}
+                  value={left ? v.weight_kg : (v.right_weight_kg ?? 0)}
+                  step={WEIGHT_STEP_KG}
+                  decimals
+                  unit="kg"
+                  onChange={(w) => set(left ? { weight_kg: w } : { right_weight_kg: w })}
+                />
+                <Stepper
+                  label={`${left ? 'left' : 'right'} reps`}
+                  value={left ? v.reps : (v.right_reps ?? 0)}
+                  step={REP_STEP}
+                  unit="reps"
+                  onChange={(r) => set(left ? { reps: r } : { right_reps: r })}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className={`flex flex-col gap-4 ${sided ? 'hidden' : ''}`}>
         {(logType === 'weight_reps' || logType === 'weight_duration') && (
-          <Labelled label="Weight (kg)">{weightStepper('weight')}</Labelled>
+          <Labelled label={loadMode === 'per_hand' ? 'Weight (kg, each)' : 'Weight (kg)'}>
+            {weightStepper('weight')}
+          </Labelled>
         )}
         {logType === 'assisted_reps' && (
           <Labelled label="Assistance (kg)" hint="Less assistance = harder.">

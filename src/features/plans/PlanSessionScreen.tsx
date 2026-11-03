@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { SortableList } from '../../components/SortableList'
+import { saveOrder } from '../../db/write'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { Confirm } from '../../components/Confirm'
@@ -9,13 +11,7 @@ import { asLogType } from '../../lib/logging/logTypes'
 import { groupLabels } from '../../lib/plans/groups'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
-import {
-  addPlanExercise,
-  deletePlanSession,
-  swapOrder,
-  updatePlanSession,
-  usePlanRows,
-} from './data'
+import { addPlanExercise, deletePlanSession, updatePlanSession, usePlanRows } from './data'
 import { BackButton } from '../../components/BackButton'
 import { useSnapshotOnLeave } from './PlanEditorScreen'
 import { WeekdayPicker } from './WeekdayPicker'
@@ -118,63 +114,43 @@ export function PlanSessionScreen() {
         {exercises.length === 0 && (
           <p className="rounded-2xl bg-surface p-6 text-center text-muted">No exercises yet.</p>
         )}
-        <ul className="flex flex-col gap-2">
-          {exercises.map((pe, i) => {
+        <SortableList
+          items={exercises}
+          keyOf={(pe) => pe.id}
+          enabled={reordering}
+          onReorder={(next) => void saveOrder('plan_exercises', next)}
+          render={(pe) => {
             const ex = byId.get(pe.exercise_id)
             const targets = rows.targets.filter((t) => t.plan_exercise_id === pe.id)
             const label = labels.get(pe.id)
             return (
-              <li key={pe.id} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!reordering) setOpenId(pe.id)
-                  }}
-                  className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-surface p-4 text-left ${
-                    label ? 'border-l-4 border-accent' : ''
-                  }`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-lg font-bold">
-                      {label && (
-                        <span className="mr-2 rounded-md bg-accent/20 px-1.5 py-0.5 text-xs font-bold text-accent">
-                          {label}
-                        </span>
-                      )}
-                      {ex?.name ?? 'Unknown exercise'}
-                    </span>
-                    <span className="block truncate text-sm text-muted">
-                      {describeTargets(targets, asLogType(ex?.log_type))}
-                    </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!reordering) setOpenId(pe.id)
+                }}
+                className={`flex w-full min-w-0 items-center gap-3 rounded-2xl bg-surface p-4 text-left ${
+                  label ? 'border-l-4 border-accent' : ''
+                }`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-lg font-bold">
+                    {label && (
+                      <span className="mr-2 rounded-md bg-accent/20 px-1.5 py-0.5 text-xs font-bold text-accent">
+                        {label}
+                      </span>
+                    )}
+                    {ex?.name ?? 'Unknown exercise'}
                   </span>
-                  <span className="text-2xl text-muted">›</span>
-                </button>
-                {reordering && (
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={i === 0}
-                      onClick={() => void swapOrder('plan_exercises', exercises, i, -1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={i === exercises.length - 1}
-                      onClick={() => void swapOrder('plan_exercises', exercises, i, 1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                )}
-              </li>
+                  <span className="block truncate text-sm text-muted">
+                    {describeTargets(targets, asLogType(ex?.log_type))}
+                  </span>
+                </span>
+                <span className="text-2xl text-muted">›</span>
+              </button>
             )
-          })}
-        </ul>
+          }}
+        />
         {labels.size > 0 && (
           <p className="mt-2 text-xs text-muted">
             Matching letters (A1, A2…) are supersets: do them back to back, then rest.

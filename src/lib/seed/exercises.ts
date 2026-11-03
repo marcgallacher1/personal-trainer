@@ -1,4 +1,4 @@
-import type { LogType } from '../logging/types'
+import type { LoadMode, LogType } from '../logging/types'
 import type { MuscleId } from './muscles'
 
 export type Equipment =
@@ -32,6 +32,8 @@ export interface ExerciseSeed {
   restSeconds: number
   /** How sets are logged (weight × reps, bodyweight, assisted, timed…) */
   logType: LogType
+  /** What the weight means: the total, each of two dumbbells/handles, or left and right logged apart */
+  loadMode: LoadMode
   /** Original name used to derive the stable seed ID, when the display name has since changed. */
   idName?: string
   /** Primary movers, weight 1.0 */
@@ -275,8 +277,10 @@ const ISOLATION: Row[] = [
   ['Bayesian Cable Curl', 'cable', 'isolation', ['biceps'], []],
   ['Concentration Curl', 'dumbbell', 'isolation', ['biceps'], []],
   // Triceps
-  ['Triceps Pushdown', 'cable', 'isolation', ['triceps'], []],
+  ['Straight-Bar Pushdown', 'cable', 'isolation', ['triceps'], []],
   ['Rope Pushdown', 'cable', 'isolation', ['triceps'], []],
+  ['Single-Arm Cable Triceps Extension', 'cable', 'isolation', ['triceps'], []],
+  ['Cross-Cable Triceps Extension (Katana)', 'cable', 'isolation', ['triceps'], []],
   ['Overhead Cable Triceps Extension', 'cable', 'isolation', ['triceps'], []],
   ['Skull Crusher', 'barbell', 'isolation', ['triceps'], []],
   ['Overhead Dumbbell Triceps Extension', 'dumbbell', 'isolation', ['triceps'], []],
@@ -348,6 +352,41 @@ function logTypeFor(name: string, equipment: Equipment): LogType {
   )
 }
 
+/** Single-arm or single-leg moves: left and right are logged side by side. */
+const PER_SIDE = new Set([
+  'One-Arm Dumbbell Row',
+  'Single-Arm Cable Pulldown',
+  'Single-Arm Cable Triceps Extension',
+  'Concentration Curl',
+  'Cable Lateral Raise',
+  'Bulgarian Split Squat',
+  'Step-Up',
+  'Single-Leg Dumbbell Calf Raise',
+  'Cable Kickback',
+])
+/** Dumbbell moves done with a single dumbbell (the weight is the total). */
+const ONE_DUMBBELL = new Set([
+  'Goblet Squat',
+  'Dumbbell Pullover',
+  'Overhead Dumbbell Triceps Extension',
+])
+/** Two cables or handles at once: the weight is each side's stack. */
+const TWO_HANDLES = new Set([
+  'Cable Fly',
+  'Low-to-High Cable Fly',
+  'Cable Rear Delt Fly',
+  'Cross-Cable Triceps Extension (Katana)',
+])
+
+function loadModeFor(name: string, equipment: Equipment, logType: LogType): LoadMode {
+  if (PER_SIDE.has(name)) return 'per_side'
+  if (TWO_HANDLES.has(name)) return 'per_hand'
+  if (equipment === 'dumbbell' && !ONE_DUMBBELL.has(name) && logType !== 'weight_duration')
+    return 'per_hand'
+  if (name === "Farmer's Walk") return 'per_hand'
+  return 'total'
+}
+
 function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSeed[] {
   return rows.map(([name, equipment, pattern, primary, secondary]) => ({
     name,
@@ -356,6 +395,7 @@ function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSee
     compound,
     restSeconds,
     logType: logTypeFor(name, equipment),
+    loadMode: loadModeFor(name, equipment, logTypeFor(name, equipment)),
     primary,
     secondary,
   }))
@@ -364,6 +404,7 @@ function build(rows: Row[], compound: boolean, restSeconds: number): ExerciseSee
 /** Renamed exercises keep the ID of their original name so logged history stays linked. */
 const ID_NAMES: Record<string, string> = {
   "Farmer's Walk": "Farmer's Carry",
+  'Straight-Bar Pushdown': 'Triceps Pushdown',
 }
 
 export const EXERCISES: readonly ExerciseSeed[] = [

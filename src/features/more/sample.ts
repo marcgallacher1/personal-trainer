@@ -139,6 +139,8 @@ export async function loadSampleWorkouts(): Promise<number> {
           weight_kg: s.weightKg,
           reps: s.reps,
           duration_seconds: s.seconds,
+          right_weight_kg: null,
+          right_reps: null,
           rpe: null,
           rir: s.rir,
           set_type: 'working',

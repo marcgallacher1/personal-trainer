@@ -78,7 +78,10 @@ export const TEMPLATES: readonly PlanTemplate[] = [
             alternatives: ['Cable Rear Delt Fly', 'Rear Delt Dumbbell Fly'],
           }),
           I('Overhead Cable Triceps Extension', 3, 10, 15, 0, { superset: 'tri' }),
-          I('Triceps Pushdown', 2, 10, 15, 0, { superset: 'tri', alternatives: ['Rope Pushdown'] }),
+          I('Straight-Bar Pushdown', 2, 10, 15, 0, {
+            superset: 'tri',
+            alternatives: ['Rope Pushdown'],
+          }),
         ],
       },
       {
@@ -270,7 +273,7 @@ export const TEMPLATES: readonly PlanTemplate[] = [
           C('Lat Pulldown', 3, 8, 12),
           I('Dumbbell Lateral Raise', 3, 12, 15),
           I('EZ-Bar Curl', 2, 10, 12),
-          I('Triceps Pushdown', 2, 10, 15),
+          I('Straight-Bar Pushdown', 2, 10, 15),
         ],
       },
       {
@@ -319,7 +322,7 @@ export const TEMPLATES: readonly PlanTemplate[] = [
           C('Lat Pulldown', 3, 8, 12),
           I('Lying Leg Curl', 3, 10, 15),
           I('Dumbbell Curl', 2, 10, 12),
-          I('Triceps Pushdown', 2, 10, 15),
+          I('Straight-Bar Pushdown', 2, 10, 15),
         ],
       },
     ],

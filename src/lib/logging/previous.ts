@@ -25,12 +25,19 @@ export function previousPerformance(
 }
 
 const toDraft = (
-  s: Pick<LoggedSet, 'weight_kg' | 'reps' | 'duration_seconds' | 'set_type'>,
+  s: Pick<
+    LoggedSet,
+    'weight_kg' | 'reps' | 'duration_seconds' | 'set_type' | 'right_weight_kg' | 'right_reps'
+  >,
 ): DraftSet => ({
   weight_kg: s.weight_kg,
   reps: s.reps,
   duration_seconds: s.duration_seconds,
   set_type: s.set_type,
+  ...(s.right_reps != null && {
+    right_weight_kg: s.right_weight_kg ?? null,
+    right_reps: s.right_reps,
+  }),
 })
 
 /** Last session's sets not yet repeated today. */

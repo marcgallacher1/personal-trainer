@@ -10,6 +10,7 @@ import {
 import { monthGrid, shiftMonth } from '../../lib/time/calendar'
 import { cardioName } from '../../lib/cardio'
 import { LogWorkoutButton } from '../plans/LogWorkoutButton'
+import { ScorePill, useReviews } from '../review/ReviewBadge'
 import { formatDuration, londonDate, sessionTitle } from './format'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -18,6 +19,7 @@ export function LogScreen() {
   const active = useActiveSession()
   const summaries = useSessionSummaries()
   const exercises = useExercises()
+  const reviews = useReviews()
   const [today] = useState(() => londonDate(new Date().toISOString()))
   const [ym, setYm] = useState(() => ({
     year: Number(today.slice(0, 4)),
@@ -62,7 +64,7 @@ export function LogScreen() {
           <p className="mt-1 font-semibold">Resume ›</p>
         </Link>
       ) : (
-        <LogWorkoutButton />
+        <LogWorkoutButton past />
       )}
 
       <section className="rounded-3xl bg-surface p-4">
@@ -148,7 +150,13 @@ export function LogScreen() {
             className="block rounded-2xl bg-surface p-4 active:opacity-80"
           >
             <div className="flex items-baseline justify-between gap-2">
-              <p className="truncate font-bold">{sessionTitle(session)}</p>
+              <p className="flex min-w-0 items-center gap-2 font-bold">
+                <span className="truncate">{sessionTitle(session)}</span>
+                {(() => {
+                  const r = reviews?.(session.id)
+                  return r ? <ScorePill score={r.score} /> : null
+                })()}
+              </p>
               <p className="shrink-0 text-xs text-muted">
                 {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(
                   new Date(session.started_at),

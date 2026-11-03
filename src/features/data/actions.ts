@@ -63,6 +63,8 @@ export async function importWorkouts(workouts: readonly ImportedWorkout[]): Prom
         weight_kg: s.weightKg,
         reps: s.reps,
         duration_seconds: s.seconds,
+        right_weight_kg: null,
+        right_reps: null,
         rpe: null,
         rir: s.rir,
         set_type: s.setType,

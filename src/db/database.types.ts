@@ -174,6 +174,7 @@ export type Database = {
           id: string
           is_compound: boolean
           is_custom: boolean
+          load_mode: string
           log_type: string
           name: string
           notes: string | null
@@ -189,6 +190,7 @@ export type Database = {
           id?: string
           is_compound?: boolean
           is_custom?: boolean
+          load_mode?: string
           log_type?: string
           name: string
           notes?: string | null
@@ -204,6 +206,7 @@ export type Database = {
           id?: string
           is_compound?: boolean
           is_custom?: boolean
+          load_mode?: string
           log_type?: string
           name?: string
           notes?: string | null
@@ -1117,6 +1120,8 @@ export type Database = {
           order: number
           plan_set_target_id: string | null
           reps: number
+          right_reps: number | null
+          right_weight_kg: number | null
           rir: number | null
           rpe: number | null
           session_exercise_id: string | null
@@ -1137,6 +1142,8 @@ export type Database = {
           order?: number
           plan_set_target_id?: string | null
           reps: number
+          right_reps?: number | null
+          right_weight_kg?: number | null
           rir?: number | null
           rpe?: number | null
           session_exercise_id?: string | null
@@ -1157,6 +1164,8 @@ export type Database = {
           order?: number
           plan_set_target_id?: string | null
           reps?: number
+          right_reps?: number | null
+          right_weight_kg?: number | null
           rir?: number | null
           rpe?: number | null
           session_exercise_id?: string | null

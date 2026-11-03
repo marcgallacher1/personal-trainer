@@ -11,7 +11,13 @@ export interface TrainingSet {
   seconds: number | null
   setType: string
   rir: number | null
+  /** Real weight × reps (both dumbbells, both sides). Defaults to weightKg × reps */
+  tonnageKg?: number
 }
+
+/** Weight × reps actually moved by a set. */
+export const tonnageOf = (s: TrainingSet): number =>
+  s.tonnageKg ?? Math.max(0, s.weightKg) * Math.max(0, s.reps)
 
 export interface TrainingSession {
   id: string

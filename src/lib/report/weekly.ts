@@ -2,7 +2,7 @@
 import { summariseAdherence, weeklyAdherence, type PlannedWorkout } from '../analysis/adherence'
 import { actualMuscles, type MuscleContext } from '../analysis/muscles'
 import { exerciseTrend, recentPbs, strengthSeries } from '../analysis/strength'
-import { addDays, isWorking, type TrainingSession } from '../analysis/training'
+import { addDays, isWorking, tonnageOf, type TrainingSession } from '../analysis/training'
 import type { MuscleVolume, Rating } from '../rating/rate'
 import { PULL_MUSCLES, PUSH_MUSCLES, SUGGEST_FOR_MUSCLE } from '../rating/rules'
 
@@ -105,7 +105,7 @@ function totals(sessions: readonly TrainingSession[]) {
     for (const x of s.sets) {
       if (!isWorking(x)) continue
       sets++
-      tonnage += Math.max(0, x.weightKg) * Math.max(0, x.reps)
+      tonnage += tonnageOf(x)
     }
   }
   return { done: sessions.length, sets, tonnage: Math.round(tonnage) }

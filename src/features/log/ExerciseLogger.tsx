@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChoiceDialog } from '../../components/ChoiceDialog'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
@@ -25,7 +25,8 @@ import {
   formatSet,
 } from '../../lib/logging/logTypes'
 import { setNumbers } from '../../lib/logging/numbering'
-import { isTimed, type SetType } from '../../lib/logging/types'
+import { clock, restBefore, SET_SECONDS } from '../../lib/logging/rest'
+import { asLoadMode, isTimed, type SetType } from '../../lib/logging/types'
 import {
   deleteSet,
   logSet,
@@ -44,11 +45,13 @@ interface Props {
   se: SessionExercise
   exercise: Exercise | undefined
   sets: SetRow[]
+  /** Last set logged in this workout, for the rest timer (null when not training live) */
+  lastSetAt?: string | null
   onClose: () => void
 }
 
 /** Full-screen modal for logging one exercise. */
-export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
+export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }: Props) {
   const history = useExerciseHistory(se.exercise_id)
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
   /** The set just logged, so we can highlight it and confirm what happened. */
@@ -63,6 +66,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   const nextNumber = numbers.filter(Boolean).length + 1
   const editing = sets.find((s) => s.id === editingSetId)
   const logType = asLogType(exercise?.log_type)
+  const loadMode = asLoadMode(exercise?.load_mode)
   const timed = isTimed(logType)
   const heads = columnHeadings(logType)
   // Timed sets have no RIR column
@@ -113,7 +117,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
   async function submitNew(v: EditorValue, close: boolean) {
     const { id, prs } = await logSet(se, v, v.rir, logType, nextTarget?.id ?? null)
     const label = v.set_type === 'warmup' ? 'Warm-up' : `Set ${nextNumber}`
-    const text = `${label} logged · ${formatSet(v, logType)}`
+    const text = `${label} logged · ${formatSet(v, logType, loadMode)}`
     if (prs[0]) showToast({ message: describePR(prs[0]), tone: 'celebrate' })
     if (close) {
       if (!prs[0]) showToast({ message: `✓ ${text}` })
@@ -164,7 +168,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
       subtitle={
         previous
           ? `Last time (${shortDate(previous.date)}): ${previous.sets
-              .map((s) => formatSet(s, logType))
+              .map((s) => formatSet(s, logType, loadMode))
               .join(', ')}`
           : 'First time logging this exercise'
       }
@@ -195,6 +199,8 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
             </span>
           </section>
         )}
+
+        {lastSetAt && <RestTimer since={lastSetAt} />}
 
         {/* Logged sets */}
         <section>
@@ -227,7 +233,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                       editingSetId === s.id ? 'bg-accent/10' : ''
                     } ${justLogged?.id === s.id ? 'animate-[flash_1.8s_ease-out]' : ''} ${i > 0 ? 'border-t border-border' : ''}`}
                   >
-                    <span>
+                    <span className="flex flex-col leading-tight">
                       {type === 'working' ? (
                         <span className="text-lg font-bold">{numbers[i]}</span>
                       ) : (
@@ -237,9 +243,10 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                           {type === 'warmup' ? info.short : `${numbers[i]} ${info.short}`}
                         </span>
                       )}
+                      {i > 0 && restLabel(sets[i - 1]!, s)}
                     </span>
                     <span className="truncate text-lg font-semibold tabular-nums">
-                      {formatLoad(s, logType)}
+                      {formatLoad(s, logType, loadMode)}
                     </span>
                     <span className="text-lg font-semibold tabular-nums">
                       {formatEffort(s, logType)}
@@ -276,6 +283,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
         {/* Editor: edit an existing set, or log the next one */}
         {editing ? (
           <SetEditor
+            loadMode={loadMode}
             key={editing.id}
             logType={logType}
             heading={`Edit set ${numbers[sets.indexOf(editing)] || ''}`.trim()}
@@ -285,6 +293,8 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
               duration_seconds: editing.duration_seconds,
               set_type: editing.set_type as SetType,
               rir: editing.rir,
+              right_weight_kg: editing.right_weight_kg,
+              right_reps: editing.right_reps,
             }}
             submitLabel="Save changes"
             onCancel={() => setEditingSetId(null)}
@@ -295,6 +305,8 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
                 duration_seconds: v.duration_seconds,
                 set_type: v.set_type,
                 rir: v.rir,
+                right_weight_kg: v.right_weight_kg ?? null,
+                right_reps: v.right_reps ?? null,
               })
               setEditingSetId(null)
             }}
@@ -309,6 +321,7 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
           />
         ) : (
           <SetEditor
+            loadMode={loadMode}
             // Re-initialise with the next prefilled values after each logged set
             key={`next-${sets.length}-${nextTarget?.id ?? 'none'}`}
             logType={logType}
@@ -430,5 +443,35 @@ export function ExerciseLogger({ se, exercise, sets, onClose }: Props) {
         onCancel={() => setConfirmRemove(false)}
       />
     </Sheet>
+  )
+}
+
+/** Small "rest 1:30" under a set number. */
+function restLabel(prev: SetRow, cur: SetRow) {
+  const r = restBefore(prev.completed_at, cur.completed_at)
+  return r === null ? null : (
+    <span className="text-[10px] font-normal text-muted tabular-nums">rest {clock(r)}</span>
+  )
+}
+
+/** Live count of time since the last set, taking off ~45 s for doing it. */
+function RestTimer({ since }: { since: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const elapsed = (now - Date.parse(since)) / 1000
+  // Over 15 minutes: you're not resting, you've moved on
+  if (elapsed > 15 * 60) return null
+  const rest = Math.max(0, elapsed - SET_SECONDS)
+  return (
+    <p
+      role="timer"
+      className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm"
+    >
+      <span className="text-muted">Resting since your last set</span>
+      <span className="text-lg font-bold tabular-nums">{clock(rest)}</span>
+    </p>
   )
 }

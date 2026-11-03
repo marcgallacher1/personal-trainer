@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { SortableList } from '../../components/SortableList'
+import { saveOrder } from '../../db/write'
 import { BackButton } from '../../components/BackButton'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
@@ -21,19 +23,13 @@ import { db } from '../../db/local'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
 import { addWorkoutExerciseToPlan, discardIfEmpty } from '../plans/data'
-import {
-  addExercise,
-  deleteSession,
-  finishSession,
-  moveSessionExercise,
-  undoDeletion,
-  updateSession,
-} from './actions'
+import { addExercise, deleteSession, finishSession, undoDeletion, updateSession } from './actions'
 import { cardioEmoji, cardioName, cardioSummary } from '../../lib/cardio'
 import { CardioLogger } from './CardioLogger'
 import { asLogType, formatSet } from '../../lib/logging/logTypes'
-import type { LogType } from '../../lib/logging/types'
+import { asLoadMode, type LoadMode, type LogType } from '../../lib/logging/types'
 import { ExerciseLogger } from './ExerciseLogger'
+import { ReviewButton, useReviews } from '../review/ReviewBadge'
 import { formatDuration, sessionTitle } from './format'
 
 /** Workout overview: one summary card per exercise; tap a card to log it in a full-screen modal. */
@@ -41,6 +37,7 @@ export function SessionScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const reviews = useReviews()
   const session = useSession(id)
   const exercises = useSessionExercises(id)
   const sets = useSessionSets(id)
@@ -89,6 +86,7 @@ export function SessionScreen() {
   const allSets = sets ?? []
   const cardioList = cardio ?? []
   const active = session.ended_at === null
+  const review = session.ended_at ? (reviews?.(session.id) ?? null) : null
   const workingSets = allSets.filter((s) => s.set_type !== 'warmup')
   const openIndex = list.findIndex((se) => se.id === openId)
   const open = openIndex >= 0 ? list[openIndex] : undefined
@@ -180,49 +178,28 @@ export function SessionScreen() {
               </button>
             )}
           </div>
-          <ul className="flex flex-col gap-2">
-            {list.map((se, i) => (
-              <li key={se.id} className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <SummaryCard
-                    name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
-                    logType={asLogType(byId.get(se.exercise_id)?.log_type)}
-                    sets={allSets.filter((s) => s.session_exercise_id === se.id)}
-                    planned={plannedFor(
-                      se.plan_exercise_id,
-                      asLogType(byId.get(se.exercise_id)?.log_type),
-                    )}
-                    notes={se.notes}
-                    onOpen={() => {
-                      if (!reordering) setOpenId(se.id)
-                    }}
-                  />
-                </div>
-                {reordering && (
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={i === 0}
-                      onClick={() => void moveSessionExercise(list, i, -1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={i === list.length - 1}
-                      onClick={() => void moveSessionExercise(list, i, 1)}
-                      className="h-9 w-11 rounded-lg bg-surface text-lg disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                  </div>
+          <SortableList
+            items={list}
+            keyOf={(se) => se.id}
+            enabled={reordering}
+            onReorder={(next) => void saveOrder('session_exercises', next)}
+            render={(se) => (
+              <SummaryCard
+                name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
+                logType={asLogType(byId.get(se.exercise_id)?.log_type)}
+                loadMode={asLoadMode(byId.get(se.exercise_id)?.load_mode)}
+                sets={allSets.filter((s) => s.session_exercise_id === se.id)}
+                planned={plannedFor(
+                  se.plan_exercise_id,
+                  asLogType(byId.get(se.exercise_id)?.log_type),
                 )}
-              </li>
-            ))}
-          </ul>
+                notes={se.notes}
+                onOpen={() => {
+                  if (!reordering) setOpenId(se.id)
+                }}
+              />
+            )}
+          />
         </section>
       )}
 
@@ -287,21 +264,30 @@ export function SessionScreen() {
           disabled={list.length === 0 && cardioList.length === 0}
           onClick={async () => {
             await finishSession(session)
-            showToast({ message: `Workout saved · ${workingSets.length} sets` })
+            showToast({
+              message: `Workout saved · ${workingSets.length} sets`,
+              action: {
+                label: 'See rating',
+                onClick: () => void navigate(`/log/session/${session.id}?review=1`),
+              },
+            })
             void navigate('/', { replace: true })
           }}
         >
           Save workout
         </Button>
       ) : (
-        <p className="text-center text-sm text-muted">
-          Saved{' '}
-          {new Date(session.ended_at!).toLocaleString('en-GB', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}
-          . You can still edit it.
-        </p>
+        <div className="flex flex-col items-center gap-2">
+          {review && <ReviewButton review={review} defaultOpen={params.get('review') === '1'} />}
+          <p className="text-center text-sm text-muted">
+            Saved{' '}
+            {new Date(session.ended_at!).toLocaleString('en-GB', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+            . You can still edit it.
+          </p>
+        </div>
       )}
       <button type="button" className="h-12 text-danger" onClick={() => setConfirmDelete(true)}>
         Delete workout
@@ -333,6 +319,16 @@ export function SessionScreen() {
           se={open}
           exercise={byId.get(open.exercise_id)}
           sets={allSets.filter((s) => s.session_exercise_id === open.id)}
+          // Rest timer runs from the last set of any exercise, only while training live
+          lastSetAt={
+            session?.ended_at
+              ? null
+              : (allSets
+                  .filter((s) => !s.deleted_at)
+                  .map((s) => s.completed_at)
+                  .toSorted()
+                  .at(-1) ?? null)
+          }
           onClose={() => setOpenId(null)}
         />
       )}
@@ -361,6 +357,7 @@ export function SessionScreen() {
 function SummaryCard({
   name,
   logType,
+  loadMode,
   sets,
   planned,
   notes,
@@ -368,6 +365,7 @@ function SummaryCard({
 }: {
   name: string
   logType: LogType
+  loadMode: LoadMode
   sets: SetRow[]
   /** Plan target summary, e.g. "3 × 8–12 reps · RIR 1" */
   planned: string | null
@@ -393,7 +391,7 @@ function SummaryCard({
               ? `Planned: ${planned}`
               : 'No sets yet · tap to log'
             : `${working.length} set${working.length === 1 ? '' : 's'} · ${working
-                .map((s) => formatSet(s, logType))
+                .map((s) => formatSet(s, logType, loadMode))
                 .join(' · ')}`}
         </span>
         {notes && <span className="mt-0.5 block truncate text-xs text-muted">✎ {notes}</span>}
