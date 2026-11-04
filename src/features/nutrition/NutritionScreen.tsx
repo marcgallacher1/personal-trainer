@@ -238,11 +238,7 @@ export function NutritionScreen() {
           )}
         </div>
 
-        <Button
-          variant="secondary"
-          className="mt-3 w-full"
-          onClick={() => setOpen({ kind: 'weight' })}
-        >
+        <Button className="mt-3 w-full" onClick={() => setOpen({ kind: 'weight' })}>
           Log weight
         </Button>
       </section>
