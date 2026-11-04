@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 
 interface ToastData {
   id: number
@@ -46,31 +46,82 @@ export function useInlineToast(): ToastData | null {
 export function ToastHost() {
   const toast = useToast()
   if (!toast || toast.placement === 'inline') return null
-  const celebrate = toast.tone === 'celebrate'
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">
-      <div
-        key={toast.id}
-        role="status"
-        className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl px-4 py-3 shadow-xl ${
-          celebrate ? 'animate-[pop_400ms_ease-out] bg-accent text-accent-fg' : 'bg-text text-bg'
-        }`}
-      >
-        {celebrate && <span className="text-2xl">🏆</span>}
-        <p className="flex-1 font-medium">{toast.message}</p>
-        {toast.action && (
-          <button
-            type="button"
-            className="h-10 shrink-0 rounded-lg px-3 font-semibold underline"
-            onClick={() => {
-              toast.action?.onClick()
-              dismiss()
-            }}
-          >
-            {toast.action.label}
-          </button>
-        )}
-      </div>
+      <FloatingToast key={toast.id} toast={toast} />
+    </div>
+  )
+}
+
+/** How far down (px) a swipe has to go to dismiss */
+const SWIPE_AWAY = 40
+
+/** One toast. Swipe it down to dismiss; it stays put while your finger is on it. */
+function FloatingToast({ toast }: { toast: ToastData }) {
+  const celebrate = toast.tone === 'celebrate'
+  const start = useRef<number | null>(null)
+  const [drag, setDrag] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  const [dragging, setDragging] = useState(false)
+
+  /** Finger lifted: slide away if pulled far enough, otherwise spring back. */
+  function release(swiped: boolean) {
+    start.current = null
+    setDragging(false)
+    if (swiped) {
+      setLeaving(true)
+      timer = setTimeout(dismiss, 200)
+    } else {
+      setDrag(0)
+      timer = setTimeout(dismiss, 2000)
+    }
+  }
+
+  return (
+    <div
+      role="status"
+      style={{
+        transform: `translateY(${leaving ? 160 : drag}px)`,
+        opacity: leaving ? 0 : 1 - Math.min(drag, 120) / 200,
+        transition: dragging ? 'none' : 'transform 200ms ease-out, opacity 200ms',
+        // Drags that start on the toast move the toast, not the page
+        touchAction: 'none',
+      }}
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return
+        start.current = e.clientY
+        setDragging(true)
+        // Don't vanish mid-swipe
+        clearTimeout(timer)
+      }}
+      onPointerMove={(e) => {
+        if (start.current === null) return
+        setDrag(Math.max(0, e.clientY - start.current))
+      }}
+      onPointerUp={() => {
+        if (start.current !== null) release(drag > SWIPE_AWAY)
+      }}
+      onPointerCancel={() => {
+        if (start.current !== null) release(false)
+      }}
+      className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl px-4 py-3 shadow-xl ${
+        celebrate ? 'animate-[pop_400ms_ease-out] bg-accent text-accent-fg' : 'bg-text text-bg'
+      }`}
+    >
+      {celebrate && <span className="text-2xl">🏆</span>}
+      <p className="flex-1 font-medium">{toast.message}</p>
+      {toast.action && (
+        <button
+          type="button"
+          className="h-10 shrink-0 rounded-lg px-3 font-semibold underline"
+          onClick={() => {
+            toast.action?.onClick()
+            dismiss()
+          }}
+        >
+          {toast.action.label}
+        </button>
+      )}
     </div>
   )
 }
