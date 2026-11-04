@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { cardioName, cardioSummary, cardioTotals } from './cardio'
+import {
+  cardioLeft,
+  cardioName,
+  cardioSummary,
+  cardioTotals,
+  describePlannedCardio,
+  plannedCardio,
+} from './cardio'
 
 const entry = {
   activity: 'run',
@@ -35,5 +42,41 @@ describe('cardioName', () => {
     expect(cardioName('stairs')).toBe('Stair climber')
     expect(cardioName('elliptical')).toBe('Cross-trainer')
     expect(cardioName('parkour')).toBe('parkour')
+  })
+})
+
+describe('planned cardio', () => {
+  it('reads cardio_json and drops anything malformed', () => {
+    expect(
+      plannedCardio([
+        { activity: 'run', minutes: 20 },
+        { activity: 'teleport', minutes: 5 },
+        { activity: 'row', minutes: 0 },
+        null,
+      ]),
+    ).toEqual([{ activity: 'run', minutes: 20 }])
+    expect(plannedCardio(null)).toEqual([])
+  })
+
+  it('describes it in a few words', () => {
+    expect(
+      describePlannedCardio([
+        { activity: 'run', minutes: 20 },
+        { activity: 'row', minutes: 10 },
+      ]),
+    ).toBe('20 min running + 10 min rowing machine')
+  })
+
+  it('ticks off what has been logged, one entry each', () => {
+    const plan = [
+      { activity: 'run', minutes: 10 },
+      { activity: 'run', minutes: 10 },
+      { activity: 'row', minutes: 5 },
+    ] as const
+    expect(cardioLeft(plan, [{ activity: 'run' }])).toEqual([
+      { activity: 'run', minutes: 10 },
+      { activity: 'row', minutes: 5 },
+    ])
+    expect(cardioLeft(plan, [{ activity: 'cycle' }])).toHaveLength(3)
   })
 })

@@ -11,6 +11,7 @@ import {
   cardioName,
   isMainCardio,
   type CardioActivity,
+  type PlannedCardio,
 } from '../../lib/cardio'
 import { deleteCardio, saveCardio, undoDeletion } from './actions'
 
@@ -18,27 +19,23 @@ interface Props {
   sessionId: string
   /** Edit this entry; omit to add a new one */
   existing?: CardioEntry
+  /** Starting values for a new entry, e.g. the plan's cardio */
+  preset?: PlannedCardio
   onClose: () => void
 }
 
 /** Full-screen modal to add or edit one cardio entry. */
-export function CardioLogger({ sessionId, existing, onClose }: Props) {
+export function CardioLogger({ sessionId, existing, preset, onClose }: Props) {
   const [activity, setActivity] = useState<CardioActivity>(
-    (existing?.activity as CardioActivity | undefined) ?? 'run',
+    (existing?.activity as CardioActivity | undefined) ?? preset?.activity ?? 'run',
   )
-  const [minutes, setMinutes] = useState(existing ? Math.round(existing.duration_seconds / 60) : 20)
+  const [minutes, setMinutes] = useState(
+    existing ? Math.round(existing.duration_seconds / 60) : (preset?.minutes ?? 20),
+  )
   const [calories, setCalories] = useState(existing?.calories ?? 0)
   const [distance, setDistance] = useState(existing?.distance_km ?? 0)
   const [avgHr, setAvgHr] = useState(existing?.avg_hr ?? 0)
   const [notes, setNotes] = useState(existing?.notes ?? '')
-  const otherSelected = !isMainCardio(activity)
-  const [showOther, setShowOther] = useState(false)
-
-  function pickOther(a: CardioActivity) {
-    setActivity(a)
-    setShowOther(false)
-  }
-
   async function save() {
     await saveCardio(
       sessionId,
@@ -85,48 +82,7 @@ export function CardioLogger({ sessionId, existing, onClose }: Props) {
       }
     >
       <div className="flex flex-col gap-5">
-        <Field label="Activity">
-          <div className="grid grid-cols-5 gap-2">
-            {CARDIO_MAIN.map((a) => (
-              <ActivityTile
-                key={a}
-                emoji={CARDIO_LABELS[a].emoji}
-                name={CARDIO_LABELS[a].name}
-                selected={activity === a}
-                onClick={() => {
-                  setActivity(a)
-                  setShowOther(false)
-                }}
-              />
-            ))}
-            <ActivityTile
-              emoji="➕"
-              name={otherSelected ? CARDIO_LABELS[activity].name : 'Other'}
-              selected={otherSelected || showOther}
-              onClick={() => setShowOther((s) => !s)}
-            />
-          </div>
-        </Field>
-
-        {showOther && (
-          <div className="-mt-2 flex flex-col gap-3 rounded-2xl bg-surface p-3">
-            <OtherGroup
-              title="Gym machines"
-              items={CARDIO_GYM_MACHINES}
-              selected={activity}
-              onPick={pickOther}
-            />
-            <OtherGroup
-              title="Workouts & classes"
-              items={CARDIO_GYM_CLASSES}
-              selected={activity}
-              onPick={pickOther}
-            />
-          </div>
-        )}
-        {activity === 'other' && !showOther && (
-          <p className="-mt-3 text-xs text-muted">Describe it in the notes below.</p>
-        )}
+        <ActivityPicker value={activity} onChange={setActivity} />
 
         <Field label="Duration (minutes)">
           <Stepper label="duration" value={minutes} step={5} min={0} onChange={setMinutes} />
@@ -262,5 +218,70 @@ function OtherGroup({
         ))}
       </div>
     </div>
+  )
+}
+
+/** Run, walk, cycle, swim tiles, plus "Other" for gym machines and classes. */
+export function ActivityPicker({
+  value,
+  onChange,
+  withNotes = true,
+}: {
+  value: CardioActivity
+  onChange: (a: CardioActivity) => void
+  /** Says to describe "Something else" in the notes */
+  withNotes?: boolean
+}) {
+  const otherSelected = !isMainCardio(value)
+  const [showOther, setShowOther] = useState(false)
+  function pickOther(a: CardioActivity) {
+    onChange(a)
+    setShowOther(false)
+  }
+  return (
+    <>
+      <Field label="Activity">
+        <div className="grid grid-cols-5 gap-2">
+          {CARDIO_MAIN.map((a) => (
+            <ActivityTile
+              key={a}
+              emoji={CARDIO_LABELS[a].emoji}
+              name={CARDIO_LABELS[a].name}
+              selected={value === a}
+              onClick={() => {
+                onChange(a)
+                setShowOther(false)
+              }}
+            />
+          ))}
+          <ActivityTile
+            emoji="➕"
+            name={otherSelected ? CARDIO_LABELS[value].name : 'Other'}
+            selected={otherSelected || showOther}
+            onClick={() => setShowOther((s) => !s)}
+          />
+        </div>
+      </Field>
+
+      {showOther && (
+        <div className="-mt-2 flex flex-col gap-3 rounded-2xl bg-surface p-3">
+          <OtherGroup
+            title="Gym machines"
+            items={CARDIO_GYM_MACHINES}
+            selected={value}
+            onPick={pickOther}
+          />
+          <OtherGroup
+            title="Workouts & classes"
+            items={CARDIO_GYM_CLASSES}
+            selected={value}
+            onPick={pickOther}
+          />
+        </div>
+      )}
+      {value === 'other' && !showOther && withNotes && (
+        <p className="-mt-3 text-xs text-muted">Describe it in the notes below.</p>
+      )}
+    </>
   )
 }

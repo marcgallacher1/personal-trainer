@@ -524,7 +524,11 @@ export async function restoreVersion(v: PlanVersionRow): Promise<void> {
   const restored = <T extends object>(row: T) => ({ ...row, updated_at: now, deleted_at: null })
   await save([
     { table: 'plans', row: { ...fresh.plan, ...r.planPatch } },
-    ...r.upserts.sessions.map((row) => ({ table: 'plan_sessions' as const, row: restored(row) })),
+    // Versions saved before plan cardio existed have no cardio_json
+    ...r.upserts.sessions.map((row) => ({
+      table: 'plan_sessions' as const,
+      row: restored({ ...row, cardio_json: row.cardio_json ?? [] }),
+    })),
     ...r.upserts.schedule.map((row) => ({ table: 'plan_schedule' as const, row: restored(row) })),
     ...r.upserts.exercises.map((row) => ({ table: 'plan_exercises' as const, row: restored(row) })),
     ...r.upserts.targets.map((row) => ({ table: 'plan_set_targets' as const, row: restored(row) })),

@@ -87,3 +87,42 @@ export function cardioTotals(entries: readonly CardioLike[]): {
     calories: entries.reduce((s, e) => s + (e.calories ?? 0), 0),
   }
 }
+
+/** Cardio in a plan workout (plan_sessions.cardio_json). */
+export interface PlannedCardio {
+  activity: CardioActivity
+  minutes: number
+}
+
+/** Reads cardio_json safely; skips anything malformed. */
+export function plannedCardio(json: unknown): PlannedCardio[] {
+  if (!Array.isArray(json)) return []
+  return json.flatMap((x: unknown) => {
+    const { activity, minutes } = (x ?? {}) as { activity?: unknown; minutes?: unknown }
+    return typeof activity === 'string' &&
+      (CARDIO_ACTIVITIES as readonly string[]).includes(activity) &&
+      typeof minutes === 'number' &&
+      minutes > 0
+      ? [{ activity: activity as CardioActivity, minutes: Math.round(minutes) }]
+      : []
+  })
+}
+
+/** "20 min run" / "20 min run + 10 min rowing machine" */
+export function describePlannedCardio(items: readonly PlannedCardio[]): string {
+  return items.map((c) => `${c.minutes} min ${cardioName(c.activity).toLowerCase()}`).join(' + ')
+}
+
+/** Planned cardio not logged yet: each logged entry ticks off one of the same activity. */
+export function cardioLeft(
+  planned: readonly PlannedCardio[],
+  logged: readonly { activity: string }[],
+): PlannedCardio[] {
+  const done = logged.map((l) => l.activity)
+  return planned.filter((p) => {
+    const i = done.indexOf(p.activity)
+    if (i < 0) return true
+    done.splice(i, 1)
+    return false
+  })
+}

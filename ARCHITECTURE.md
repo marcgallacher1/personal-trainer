@@ -97,6 +97,12 @@ snapshot's rows and soft-deletes anything added since.
 Targets are shown as hints only: inputs start blank, and weights never carry over between workouts. Mid-workout edits
 (add, swap, remove) ask whether to apply them today only or also to the plan.
 
+**Cardio in a plan:** a plan workout can list cardio in `plan_sessions.cardio_json`, e.g.
+`[{"activity": "run", "minutes": 20}]`. It lives on the workout row, so it syncs, versions and
+restores with it. In a workout started from the plan, cardio not logged yet shows as a dashed
+"Planned" row; tapping it opens the cardio logger pre-filled (`cardioLeft` in `src/lib/cardio.ts`).
+Workouts with only cardio still count as done for adherence and suggestions.
+
 ## Navigation
 
 Home-screen apps have no browser back button, so every screen has a top-left **Back**. It goes to

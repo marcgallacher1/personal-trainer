@@ -64,6 +64,7 @@ export function newSessionRow(
     notes: null,
     warmup_notes: null,
     est_minutes: null,
+    cardio_json: [],
     order,
   }
 }

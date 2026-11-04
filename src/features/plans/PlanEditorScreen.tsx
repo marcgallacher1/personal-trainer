@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { describePlannedCardio, plannedCardio } from '../../lib/cardio'
 import { Link, useNavigate, useParams } from 'react-router'
 import { BackButton } from '../../components/BackButton'
 import { Button } from '../../components/Button'
@@ -133,7 +134,14 @@ export function PlanEditorScreen() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-lg font-bold">{s.name}</span>
                     <span className="block text-sm text-muted">
-                      {count} exercise{count === 1 ? '' : 's'} · tap to edit
+                      {[
+                        (count > 0 || !plannedCardio(s.cardio_json).length) &&
+                          `${count} exercise${count === 1 ? '' : 's'}`,
+                        describePlannedCardio(plannedCardio(s.cardio_json)),
+                        'tap to edit',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                   </span>
                   <span className="text-2xl text-muted">›</span>

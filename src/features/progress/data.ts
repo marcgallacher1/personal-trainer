@@ -25,16 +25,19 @@ export interface TrainingData {
   planSince: string | null
 }
 
-/** Every logged workout (with at least one set) plus what's needed to analyse it. */
+/** Every logged workout (with at least one set or cardio entry) plus what's needed to analyse it. */
 export function useTrainingData(): TrainingData | undefined {
   const ctx = useRatingContext()
   const library = usePlanLibrary()
   const logged = useLiveQuery(async () => {
-    const [sessions, sets, exercises] = await Promise.all([
+    const [sessions, sets, exercises, cardio] = await Promise.all([
       db.sessions.toArray(),
       db.sets.toArray(),
       db.exercises.toArray(),
+      db.cardio_entries.toArray(),
     ])
+    // Cardio-only workouts count too (e.g. a planned run day)
+    const withCardio = new Set(cardio.filter(live).map((c) => c.session_id))
     const modeOf = new Map(exercises.map((e) => [e.id, asLoadMode(e.load_mode)]))
     const bySession = new Map<string, TrainingSession['sets']>()
     for (const s of sets) {
@@ -56,7 +59,7 @@ export function useTrainingData(): TrainingData | undefined {
     return {
       today: londonDate(new Date().toISOString()),
       sessions: sessions
-        .filter((s) => live(s) && bySession.has(s.id))
+        .filter((s) => live(s) && (bySession.has(s.id) || withCardio.has(s.id)))
         .map((s): TrainingSession => ({
           id: s.id,
           date: londonDate(s.started_at),

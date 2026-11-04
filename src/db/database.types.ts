@@ -216,6 +216,24 @@ export type Database = {
         }
         Relationships: []
       }
+      invites: {
+        Row: {
+          created_at: string
+          email: string
+          note: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          note?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          note?: string | null
+        }
+        Relationships: []
+      }
       muscle_targets: {
         Row: {
           created_at: string
@@ -614,6 +632,7 @@ export type Database = {
       }
       plan_sessions: {
         Row: {
+          cardio_json: Json
           colour: string | null
           created_at: string
           deleted_at: string | null
@@ -629,6 +648,7 @@ export type Database = {
           warmup_notes: string | null
         }
         Insert: {
+          cardio_json?: Json
           colour?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -644,6 +664,7 @@ export type Database = {
           warmup_notes?: string | null
         }
         Update: {
+          cardio_json?: Json
           colour?: string | null
           created_at?: string
           deleted_at?: string | null

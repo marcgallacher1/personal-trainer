@@ -16,6 +16,8 @@ import { BackButton } from '../../components/BackButton'
 import { useSnapshotOnLeave } from './PlanEditorScreen'
 import { WeekdayPicker } from './WeekdayPicker'
 import { PlanExerciseSheet } from './PlanExerciseSheet'
+import { PlanCardioSheet } from './PlanCardioSheet'
+import { cardioEmoji, cardioName, plannedCardio } from '../../lib/cardio'
 
 const EMOJIS = ['💪', '🦍', '🔥', '⚡', '🏋️', '🦵', '🍑', '🎯', '🅰️', '🅱️', '⭐', '🚀']
 
@@ -28,6 +30,8 @@ export function PlanSessionScreen() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [reordering, setReordering] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  /** 'new' = adding cardio; a number = editing that item */
+  const [cardioOpen, setCardioOpen] = useState<number | 'new' | null>(null)
   useSnapshotOnLeave(planId)
 
   const session = rows?.sessions.find((s) => s.id === sessionId)
@@ -46,6 +50,7 @@ export function PlanSessionScreen() {
   const byId = new Map((library ?? []).map((e) => [e.id, e]))
   const exercises = rows.exercises.filter((e) => e.plan_session_id === session.id)
   const labels = groupLabels(exercises)
+  const cardio = plannedCardio(session.cardio_json)
   const open = exercises.find((e) => e.id === openId)
   const openIndex = open ? exercises.indexOf(open) : -1
 
@@ -162,6 +167,40 @@ export function PlanSessionScreen() {
         + Add exercise
       </Button>
 
+      {cardio.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Cardio</h2>
+          <ul className="flex flex-col gap-2">
+            {cardio.map((c, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => setCardioOpen(i)}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left active:opacity-80"
+                >
+                  <span className="text-2xl">{cardioEmoji(c.activity)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-lg font-bold">
+                      {cardioName(c.activity)}
+                    </span>
+                    <span className="block truncate text-sm text-muted">{c.minutes} min</span>
+                  </span>
+                  <span className="text-2xl text-muted">›</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setCardioOpen('new')}
+        className="h-12 rounded-xl border border-border text-base font-semibold text-muted active:bg-surface"
+      >
+        + Add cardio
+      </button>
+
       <button type="button" className="h-12 text-danger" onClick={() => setConfirmDelete(true)}>
         Remove from plan
       </button>
@@ -192,10 +231,19 @@ export function PlanSessionScreen() {
         />
       )}
 
+      {cardioOpen !== null && (
+        <PlanCardioSheet
+          key={String(cardioOpen)}
+          session={session}
+          index={cardioOpen === 'new' ? null : cardioOpen}
+          onClose={() => setCardioOpen(null)}
+        />
+      )}
+
       <Confirm
         open={confirmDelete}
         title={`Remove ${session.name} from ${rows.plan.name}?`}
-        body="Its exercises and targets are removed from the plan. Logged workouts are kept."
+        body="Its exercises, cardio and targets are removed from the plan. Logged workouts are kept."
         confirmLabel="Remove"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={async () => {

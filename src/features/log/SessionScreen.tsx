@@ -24,7 +24,14 @@ import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
 import { addWorkoutExerciseToPlan, discardIfEmpty } from '../plans/data'
 import { addExercise, deleteSession, finishSession, undoDeletion, updateSession } from './actions'
-import { cardioEmoji, cardioName, cardioSummary } from '../../lib/cardio'
+import {
+  cardioEmoji,
+  cardioLeft,
+  cardioName,
+  cardioSummary,
+  plannedCardio,
+  type PlannedCardio,
+} from '../../lib/cardio'
 import { CardioLogger } from './CardioLogger'
 import { asLogType, formatSet } from '../../lib/logging/logTypes'
 import { asLoadMode, type LoadMode, type LogType } from '../../lib/logging/types'
@@ -47,7 +54,12 @@ export function SessionScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [reordering, setReordering] = useState(false)
   /** 'new' = adding cardio; an entry = editing it */
-  const [cardioOpen, setCardioOpen] = useState<CardioEntry | 'new' | null>(null)
+  const [cardioOpen, setCardioOpen] = useState<CardioEntry | 'new' | PlannedCardio | null>(null)
+  // The plan's cardio for this workout, if it was started from one
+  const planCardio = useLiveQuery(async () => {
+    const psId = session?.plan_session_id
+    return psId ? plannedCardio((await db.plan_sessions.get(psId))?.cardio_json) : []
+  }, [session?.plan_session_id])
   const plannedTargets = useLiveQuery(async () => {
     const ids = (exercises ?? []).map((e) => e.plan_exercise_id).filter((x): x is string => !!x)
     return ids.length
@@ -85,6 +97,7 @@ export function SessionScreen() {
   const list = exercises ?? []
   const allSets = sets ?? []
   const cardioList = cardio ?? []
+  const cardioToDo = cardioLeft(planCardio ?? [], cardioList)
   const active = session.ended_at === null
   const review = session.ended_at ? (reviews?.(session.id) ?? null) : null
   const workingSets = allSets.filter((s) => s.set_type !== 'warmup')
@@ -209,7 +222,7 @@ export function SessionScreen() {
         + Add exercise
       </Button>
 
-      {cardioList.length > 0 && (
+      {(cardioList.length > 0 || cardioToDo.length > 0) && (
         <section>
           <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Cardio</h2>
           <ul className="flex flex-col gap-2">
@@ -228,6 +241,26 @@ export function SessionScreen() {
                     <span className="block truncate text-sm text-muted">{cardioSummary(c)}</span>
                   </span>
                   <span className="text-2xl text-muted">›</span>
+                </button>
+              </li>
+            ))}
+            {cardioToDo.map((c, i) => (
+              <li key={`plan-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => setCardioOpen(c)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-border p-4 text-left active:opacity-80"
+                >
+                  <span className="text-2xl opacity-60">{cardioEmoji(c.activity)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-lg font-bold">
+                      {cardioName(c.activity)}
+                    </span>
+                    <span className="block truncate text-sm text-muted">
+                      Planned · {c.minutes} min
+                    </span>
+                  </span>
+                  <span className="text-sm font-bold text-accent">Log ›</span>
                 </button>
               </li>
             ))}
@@ -336,9 +369,10 @@ export function SessionScreen() {
 
       {cardioOpen && (
         <CardioLogger
-          key={cardioOpen === 'new' ? 'new' : cardioOpen.id}
+          key={cardioOpen === 'new' ? 'new' : 'id' in cardioOpen ? cardioOpen.id : 'planned'}
           sessionId={session.id}
-          existing={cardioOpen === 'new' ? undefined : cardioOpen}
+          existing={cardioOpen !== 'new' && 'id' in cardioOpen ? cardioOpen : undefined}
+          preset={cardioOpen !== 'new' && !('id' in cardioOpen) ? cardioOpen : undefined}
           onClose={() => setCardioOpen(null)}
         />
       )}

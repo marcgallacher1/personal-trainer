@@ -5,7 +5,7 @@ entirely on free tiers (Supabase and Vercel).
 
 - **Logging:** fast, offline set logging with a rest timer. Workouts are live (Start workout) or entered
   afterwards (Log workout). Weights can mean the total, each dumbbell, or left and right for single-arm moves.
-- **Plans:** a plan builder and editor with drag-to-reorder and version history. A plan rating with
+- **Plans:** a plan builder and editor with drag-to-reorder and version history. Workouts can include cardio (e.g. 20 min running) as well as weights. A plan rating with
   one-tap fixes. "Suggested today" picks the best workout from what's left this week.
 - **Analysis:** Progress charts, plan adherence, PBs and stalls, a rating for every workout, and weekly
   reports with 3 actions for next week.
