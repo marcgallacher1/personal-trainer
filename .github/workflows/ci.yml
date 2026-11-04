@@ -40,7 +40,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ci-placeholder
 
   db:
-    runs-on: ubuntu-latest
+    # Pinned while the Supabase local stack fails on the newer ubuntu-latest image
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
