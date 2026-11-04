@@ -3,7 +3,7 @@ import { Sheet } from '../../components/Sheet'
 import { useExercises, type Exercise } from '../../db/queries'
 import { asLogType } from '../../lib/logging/logTypes'
 import type { CustomExercise } from '../../lib/plans/draft'
-import { cardioEmoji, cardioName, type PlannedCardio } from '../../lib/cardio'
+import { cardioEmoji, cardioName, detailsSummary, type PlannedCardio } from '../../lib/cardio'
 import { CardioPlanSheet } from './PlanCardioSheet'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
@@ -95,7 +95,11 @@ export function CustomWorkoutCard({
                     <span className="min-w-0 flex-1 truncate">
                       {cardioEmoji(c.activity)} {cardioName(c.activity)}
                     </span>
-                    <span className="shrink-0 text-muted">{c.minutes} min</span>
+                    <span className="shrink-0 text-muted">
+                      {[`${c.minutes} min`, detailsSummary(c.details ?? {})]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -189,7 +193,11 @@ export function CustomWorkoutCard({
                     <span className="min-w-0 flex-1 truncate">
                       {cardioEmoji(c.activity)} {cardioName(c.activity)}
                     </span>
-                    <span className="shrink-0 text-muted">{c.minutes} min</span>
+                    <span className="shrink-0 text-muted">
+                      {[`${c.minutes} min`, detailsSummary(c.details ?? {})]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   </button>
                 </li>
               ))}

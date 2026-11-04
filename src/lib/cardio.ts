@@ -95,19 +95,32 @@ export function cardioTotals(entries: readonly CardioLike[]): {
 export interface PlannedCardio {
   activity: CardioActivity
   minutes: number
+  /** Optional plan for speed, incline, intervals… */
+  details?: CardioDetails
 }
 
 /** Reads cardio_json safely; skips anything malformed. */
 export function plannedCardio(json: unknown): PlannedCardio[] {
   if (!Array.isArray(json)) return []
   return json.flatMap((x: unknown) => {
-    const { activity, minutes } = (x ?? {}) as { activity?: unknown; minutes?: unknown }
-    return typeof activity === 'string' &&
-      (CARDIO_ACTIVITIES as readonly string[]).includes(activity) &&
-      typeof minutes === 'number' &&
-      minutes > 0
-      ? [{ activity: activity as CardioActivity, minutes: Math.round(minutes) }]
-      : []
+    const { activity, minutes, details } = (x ?? {}) as {
+      activity?: unknown
+      minutes?: unknown
+      details?: unknown
+    }
+    if (
+      typeof activity !== 'string' ||
+      !(CARDIO_ACTIVITIES as readonly string[]).includes(activity) ||
+      typeof minutes !== 'number' ||
+      minutes <= 0
+    )
+      return []
+    const d = cleanDetails(activity, cardioDetails(details))
+    const item: PlannedCardio = {
+      activity: activity as CardioActivity,
+      minutes: Math.round(minutes),
+    }
+    return [Object.keys(d).length ? { ...item, details: d } : item]
   })
 }
 

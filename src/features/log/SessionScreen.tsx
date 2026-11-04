@@ -29,6 +29,7 @@ import {
   cardioLeft,
   cardioName,
   cardioSummary,
+  detailsSummary,
   plannedCardio,
   type PlannedCardio,
 } from '../../lib/cardio'
@@ -257,7 +258,10 @@ export function SessionScreen() {
                       {cardioName(c.activity)}
                     </span>
                     <span className="block truncate text-sm text-muted">
-                      Planned · {c.minutes} min
+                      Planned ·{' '}
+                      {[`${c.minutes} min`, detailsSummary(c.details ?? {})]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                   </span>
                   <span className="text-sm font-bold text-accent">Log ›</span>

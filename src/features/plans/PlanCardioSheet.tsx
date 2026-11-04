@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { Sheet } from '../../components/Sheet'
 import { Stepper } from '../../components/Stepper'
-import { plannedCardio, type CardioActivity, type PlannedCardio } from '../../lib/cardio'
+import {
+  cleanDetails,
+  plannedCardio,
+  type CardioActivity,
+  type CardioDetails,
+  type PlannedCardio,
+} from '../../lib/cardio'
 import type { PlanSessionRow } from '../../lib/plans/instantiate'
-import { ActivityPicker } from '../log/CardioLogger'
+import { ActivityPicker, DetailsEditor } from '../log/CardioLogger'
 import { updatePlanSession } from './data'
 
 /** Pick an activity and minutes. With `initial`, it's an edit and offers Remove. */
@@ -20,19 +26,24 @@ export function CardioPlanSheet({
 }) {
   const [activity, setActivity] = useState<CardioActivity>(initial?.activity ?? 'run')
   const [minutes, setMinutes] = useState(initial?.minutes ?? 20)
+  const [details, setDetails] = useState<CardioDetails>(initial?.details ?? {})
+  const planned = (): PlannedCardio => {
+    const d = cleanDetails(activity, details)
+    return Object.keys(d).length ? { activity, minutes, details: d } : { activity, minutes }
+  }
 
   return (
     <Sheet
       open
       title={initial ? 'Edit cardio' : 'Add cardio'}
-      subtitle="Log the details on the day."
+      subtitle="Speed, intervals and the rest are optional."
       closeLabel="Cancel"
       onClose={onClose}
       footer={
         <button
           type="button"
           disabled={minutes <= 0}
-          onClick={() => void Promise.resolve(onSave({ activity, minutes })).then(onClose)}
+          onClick={() => void Promise.resolve(onSave(planned())).then(onClose)}
           className="h-14 w-full rounded-2xl bg-accent text-lg font-bold text-accent-fg disabled:opacity-40"
         >
           {initial ? 'Save changes' : 'Add to workout'}
@@ -47,6 +58,7 @@ export function CardioPlanSheet({
           </h3>
           <Stepper label="duration" value={minutes} step={5} min={0} onChange={setMinutes} />
         </section>
+        <DetailsEditor activity={activity} value={details} onChange={setDetails} />
         {initial && onRemove && (
           <button
             type="button"

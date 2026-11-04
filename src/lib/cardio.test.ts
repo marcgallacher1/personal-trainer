@@ -63,6 +63,12 @@ describe('planned cardio', () => {
     expect(plannedCardio(null)).toEqual([])
   })
 
+  it('keeps planned details that fit the activity', () => {
+    expect(
+      plannedCardio([{ activity: 'run', minutes: 20, details: { speedKmh: 10, lengths: 4 } }]),
+    ).toEqual([{ activity: 'run', minutes: 20, details: { speedKmh: 10 } }])
+  })
+
   it('describes it in a few words', () => {
     expect(
       describePlannedCardio([

@@ -17,7 +17,7 @@ import { useSnapshotOnLeave } from './PlanEditorScreen'
 import { WeekdayPicker } from './WeekdayPicker'
 import { PlanExerciseSheet } from './PlanExerciseSheet'
 import { PlanCardioSheet } from './PlanCardioSheet'
-import { cardioEmoji, cardioName, plannedCardio } from '../../lib/cardio'
+import { cardioEmoji, cardioName, detailsSummary, plannedCardio } from '../../lib/cardio'
 
 const EMOJIS = ['💪', '🦍', '🔥', '⚡', '🏋️', '🦵', '🍑', '🎯', '🅰️', '🅱️', '⭐', '🚀']
 
@@ -183,7 +183,11 @@ export function PlanSessionScreen() {
                     <span className="block truncate text-lg font-bold">
                       {cardioName(c.activity)}
                     </span>
-                    <span className="block truncate text-sm text-muted">{c.minutes} min</span>
+                    <span className="block truncate text-sm text-muted">
+                      {[`${c.minutes} min`, detailsSummary(c.details ?? {})]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
                   </span>
                   <span className="text-2xl text-muted">›</span>
                 </button>

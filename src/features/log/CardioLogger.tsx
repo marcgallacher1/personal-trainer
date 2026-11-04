@@ -41,7 +41,9 @@ export function CardioLogger({ sessionId, existing, preset, onClose }: Props) {
   const [distance, setDistance] = useState(existing?.distance_km ?? 0)
   const [avgHr, setAvgHr] = useState(existing?.avg_hr ?? 0)
   const [notes, setNotes] = useState(existing?.notes ?? '')
-  const [details, setDetails] = useState<CardioDetails>(() => cardioDetails(existing?.details_json))
+  const [details, setDetails] = useState<CardioDetails>(() =>
+    existing ? cardioDetails(existing.details_json) : (preset?.details ?? {}),
+  )
   const kept = cleanDetails(activity, details)
   async function save() {
     await saveCardio(
@@ -301,7 +303,7 @@ const POOLS = [25, 50]
 const n = (x: number | undefined) => x ?? 0
 
 /** Optional extras for the activity: speed, incline, level, intervals, or pool and lengths. */
-function DetailsEditor({
+export function DetailsEditor({
   activity,
   value,
   onChange,
