@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { NutritionScreen } from '../features/nutrition/NutritionScreen'
 import { StartWorkoutScreen } from '../features/plans/LogWorkoutButton'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { supabaseConfigured } from '../db/supabase'
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
       { path: '/reports', element: <ReportsScreen /> },
       { path: '/reports/:week', element: <ReportScreen /> },
       { path: '/goals', element: <GoalsScreen /> },
+      { path: '/nutrition', element: <NutritionScreen /> },
       { path: '/more', element: <MoreScreen /> },
       { path: '/settings', element: <SettingsScreen /> },
       { path: '/settings/setup', element: <SetupWizard /> },

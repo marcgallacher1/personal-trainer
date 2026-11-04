@@ -170,3 +170,11 @@ All of this is pure, tested logic in `src/lib`. Nothing changes the plan without
   "To work on" reason, e.g. down vs last time, skipped plan exercises, too many sets for one muscle,
   easy sets, or a very long session. It's worked out when you view it; nothing is stored.
 - **Weekly report** (`report/weekly.ts`): see Principles above.
+
+## Nutrition
+
+More → Nutrition logs protein grams (`protein_logs`) and weigh-ins (`bodyweight_logs`, one per
+day; logging again corrects it). Quick foods work out the grams (`src/lib/nutrition.ts`). The
+target is the latest weigh-in, or the profile weight, × `protein_g_per_kg` (1.8 by default); a
+newer weigh-in also updates `profiles.bodyweight_kg`, so the server reminders and reports use the
+same target. The trend is a 7-day average of weigh-ins.

@@ -61,6 +61,7 @@ export function Stepper({
       </button>
       {editing !== null ? (
         <input
+          aria-label={label}
           autoFocus
           inputMode={decimals ? 'decimal' : format ? 'text' : 'numeric'}
           value={editing}

@@ -56,6 +56,17 @@ export function MoreScreen() {
         </Link>
 
         <Link
+          to="/nutrition"
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
+        >
+          <span className="text-2xl">🥗</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-bold">Nutrition</span>
+            <span className="block text-sm text-muted">Protein and bodyweight</span>
+          </span>
+          <span className="text-2xl text-muted">›</span>
+        </Link>
+        <Link
           to="/data"
           className="flex items-center gap-3 rounded-2xl bg-surface p-4 active:opacity-80"
         >
