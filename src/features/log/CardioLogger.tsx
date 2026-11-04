@@ -10,7 +10,12 @@ import {
   CARDIO_MAIN,
   cardioName,
   isMainCardio,
+  cardioDetails,
+  cleanDetails,
+  detailFields,
+  swimKm,
   type CardioActivity,
+  type CardioDetails,
   type PlannedCardio,
 } from '../../lib/cardio'
 import { deleteCardio, saveCardio, undoDeletion } from './actions'
@@ -36,6 +41,8 @@ export function CardioLogger({ sessionId, existing, preset, onClose }: Props) {
   const [distance, setDistance] = useState(existing?.distance_km ?? 0)
   const [avgHr, setAvgHr] = useState(existing?.avg_hr ?? 0)
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [details, setDetails] = useState<CardioDetails>(() => cardioDetails(existing?.details_json))
+  const kept = cleanDetails(activity, details)
   async function save() {
     await saveCardio(
       sessionId,
@@ -43,9 +50,11 @@ export function CardioLogger({ sessionId, existing, preset, onClose }: Props) {
         activity,
         duration_seconds: minutes * 60,
         calories: calories || null,
-        distance_km: distance || null,
+        // Swims work out their distance from the pool
+        distance_km: distance || swimKm(kept) || null,
         avg_hr: avgHr || null,
         notes: notes.trim() || null,
+        details_json: kept as CardioEntry['details_json'],
       },
       existing,
     )
@@ -87,6 +96,8 @@ export function CardioLogger({ sessionId, existing, preset, onClose }: Props) {
         <Field label="Duration (minutes)">
           <Stepper label="duration" value={minutes} step={5} min={0} onChange={setMinutes} />
         </Field>
+
+        <DetailsEditor activity={activity} value={details} onChange={setDetails} />
 
         <Field label="Calories burned (kcal)" hint="From the machine or your watch. Optional.">
           <Stepper
@@ -283,5 +294,223 @@ export function ActivityPicker({
         <p className="-mt-3 text-xs text-muted">Describe it in the notes below.</p>
       )}
     </>
+  )
+}
+
+const POOLS = [25, 50]
+const n = (x: number | undefined) => x ?? 0
+
+/** Optional extras for the activity: speed, incline, level, intervals, or pool and lengths. */
+function DetailsEditor({
+  activity,
+  value,
+  onChange,
+}: {
+  activity: string
+  value: CardioDetails
+  onChange: (d: CardioDetails) => void
+}) {
+  const fields = detailFields(activity)
+  const has = (f: string) => fields.includes(f as never)
+  const filled = Object.keys(cleanDetails(activity, value)).length > 0
+  const [open, setOpen] = useState(filled)
+  const [otherPool, setOtherPool] = useState(
+    value.poolLengthM !== undefined && !POOLS.includes(value.poolLengthM),
+  )
+  const set = (patch: CardioDetails) => onChange({ ...value, ...patch })
+  if (!fields.length) return null
+
+  // Swimming: pool and lengths are the main thing, so always shown
+  const pool = has('pool') && (
+    <>
+      <Field label="Pool length">
+        <div className="grid grid-cols-3 gap-2">
+          {POOLS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={!otherPool && value.poolLengthM === m}
+              onClick={() => {
+                setOtherPool(false)
+                set({ poolLengthM: value.poolLengthM === m ? undefined : m })
+              }}
+              className={`h-12 rounded-xl font-semibold ${
+                !otherPool && value.poolLengthM === m
+                  ? 'bg-accent text-accent-fg'
+                  : 'bg-surface text-muted'
+              }`}
+            >
+              {m} m
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={otherPool}
+            onClick={() => setOtherPool((o) => !o)}
+            className={`h-12 rounded-xl font-semibold ${
+              otherPool ? 'bg-accent text-accent-fg' : 'bg-surface text-muted'
+            }`}
+          >
+            Other
+          </button>
+        </div>
+        {otherPool && (
+          <div className="mt-2">
+            <Stepper
+              label="pool length in metres"
+              value={n(value.poolLengthM)}
+              step={1}
+              emptyLabel="–"
+              onChange={(v) => set({ poolLengthM: v })}
+            />
+          </div>
+        )}
+      </Field>
+      <Field
+        label="Lengths"
+        hint={swimKm(value) ? `That's ${swimKm(value)} km.` : 'Optional. Gives your distance.'}
+      >
+        <Stepper
+          label="lengths"
+          value={n(value.lengths)}
+          step={2}
+          emptyLabel="–"
+          onChange={(v) => set({ lengths: v })}
+        />
+      </Field>
+    </>
+  )
+
+  const extras = fields.filter((f) => f !== 'pool')
+  const extraNames: Record<string, string> = {
+    speed: 'speed',
+    incline: 'incline',
+    level: 'level',
+    intervals: 'intervals',
+  }
+
+  return (
+    <>
+      {pool}
+      {extras.length > 0 &&
+        (open ? (
+          <>
+            {has('speed') && (
+              <Field label="Speed (km/h)" hint="Optional. From the treadmill or your watch.">
+                <Stepper
+                  label="speed"
+                  value={n(value.speedKmh)}
+                  step={0.5}
+                  decimals
+                  emptyLabel="–"
+                  onChange={(v) => set({ speedKmh: v })}
+                />
+              </Field>
+            )}
+            {has('incline') && (
+              <Field label="Incline (%)" hint="Optional.">
+                <Stepper
+                  label="incline"
+                  value={n(value.inclinePct)}
+                  step={0.5}
+                  decimals
+                  emptyLabel="–"
+                  onChange={(v) => set({ inclinePct: v })}
+                />
+              </Field>
+            )}
+            {has('level') && (
+              <Field label="Level / resistance" hint="Optional. The number on the machine.">
+                <Stepper
+                  label="level"
+                  value={n(value.level)}
+                  step={1}
+                  emptyLabel="–"
+                  onChange={(v) => set({ level: v })}
+                />
+              </Field>
+            )}
+            {has('intervals') && (
+              <Field label="Intervals" hint="Optional. E.g. 6 rounds of 1 min hard, 90 s easy.">
+                <div className="grid grid-cols-3 gap-2">
+                  <IntervalBox
+                    label="Rounds"
+                    value={n(value.rounds)}
+                    step={1}
+                    onChange={(v) => set({ rounds: v })}
+                  />
+                  <IntervalBox
+                    label="Hard (sec)"
+                    value={n(value.workSeconds)}
+                    step={15}
+                    onChange={(v) => set({ workSeconds: v })}
+                  />
+                  <IntervalBox
+                    label="Easy (sec)"
+                    value={n(value.restSeconds)}
+                    step={15}
+                    onChange={(v) => set({ restSeconds: v })}
+                  />
+                </div>
+              </Field>
+            )}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="-mt-2 h-10 self-start text-sm font-semibold text-accent"
+          >
+            + Add {extras.map((f) => extraNames[f]).join(', ')}
+          </button>
+        ))}
+    </>
+  )
+}
+
+/** A small number box for the interval rounds and seconds. */
+function IntervalBox({
+  label,
+  value,
+  step,
+  onChange,
+}: {
+  label: string
+  value: number
+  step: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <label className="flex flex-col items-center gap-1 rounded-xl bg-surface p-2">
+      <span className="text-xs font-semibold text-muted">{label}</span>
+      <input
+        inputMode="numeric"
+        value={value || ''}
+        placeholder="–"
+        onFocus={(e) => e.target.select()}
+        onChange={(e) =>
+          onChange(Math.max(0, Math.min(3600, Math.round(Number(e.target.value) || 0))))
+        }
+        className="h-10 w-full bg-transparent text-center text-xl font-bold tabular-nums outline-none"
+      />
+      <span className="flex gap-1">
+        <button
+          type="button"
+          aria-label={`Less ${label}`}
+          onClick={() => onChange(Math.max(0, value - step))}
+          className="h-8 w-8 rounded-lg bg-surface-2 font-bold"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label={`More ${label}`}
+          onClick={() => onChange(value + step)}
+          className="h-8 w-8 rounded-lg bg-surface-2 font-bold"
+        >
+          +
+        </button>
+      </span>
+    </label>
   )
 }

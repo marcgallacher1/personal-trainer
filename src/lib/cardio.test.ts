@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cardioDetails,
   cardioLeft,
+  cleanDetails,
+  detailFields,
+  detailsSummary,
+  swimKm,
   cardioName,
   cardioSummary,
   cardioTotals,
@@ -78,5 +83,34 @@ describe('planned cardio', () => {
       { activity: 'row', minutes: 5 },
     ])
     expect(cardioLeft(plan, [{ activity: 'cycle' }])).toHaveLength(3)
+  })
+})
+
+describe('cardio details', () => {
+  it('offers only what fits the activity', () => {
+    expect(detailFields('run')).toEqual(['speed', 'incline', 'intervals'])
+    expect(detailFields('swim')).toEqual(['pool', 'intervals'])
+    expect(detailFields('other')).toEqual([])
+  })
+
+  it('keeps positive numbers that apply, drops the rest', () => {
+    expect(
+      cleanDetails('run', { speedKmh: 10, inclinePct: 0, poolLengthM: 25, rounds: 6 }),
+    ).toEqual({ speedKmh: 10, rounds: 6 })
+    expect(cardioDetails({ speedKmh: 'fast', lengths: 40, junk: 1 })).toEqual({ lengths: 40 })
+    expect(cardioDetails(null)).toEqual({})
+  })
+
+  it('works out swim distance from the pool', () => {
+    expect(swimKm({ poolLengthM: 25, lengths: 40 })).toBe(1)
+    expect(swimKm({ lengths: 40 })).toBeNull()
+  })
+
+  it('summarises in plain words', () => {
+    expect(
+      detailsSummary({ speedKmh: 8.5, inclinePct: 5, rounds: 6, workSeconds: 60, restSeconds: 90 }),
+    ).toBe('8.5 km/h · 5% incline · 6 × 1 min on, 90s off')
+    expect(detailsSummary({ poolLengthM: 25, lengths: 40 })).toBe('40 × 25 m')
+    expect(detailsSummary({})).toBe('')
   })
 })

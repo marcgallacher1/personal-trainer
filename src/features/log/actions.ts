@@ -196,6 +196,8 @@ export interface CardioInput {
   distance_km: number | null
   avg_hr: number | null
   notes: string | null
+  /** Speed, incline, intervals, pool… (see CardioDetails) */
+  details_json?: CardioEntry['details_json']
 }
 
 /** Creates a cardio entry, or updates `existing`. */
@@ -216,6 +218,7 @@ export async function saveCardio(
     id: newId(),
     user_id: requireUserId(),
     session_id: sessionId,
+    details_json: {},
     ...input,
     order: Math.max(-1, ...others.map((c) => c.order)) + 1,
     completed_at: now,

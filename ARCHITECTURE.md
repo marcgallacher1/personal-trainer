@@ -103,6 +103,11 @@ restores with it. In a workout started from the plan, cardio not logged yet show
 "Planned" row; tapping it opens the cardio logger pre-filled (`cardioLeft` in `src/lib/cardio.ts`).
 Workouts with only cardio still count as done for adherence and suggestions.
 
+**Cardio details:** each entry can carry optional extras in `cardio_entries.details_json`: speed
+and incline (running, walking), level (gym machines), intervals (rounds, hard and easy seconds),
+and pool length and lengths for swimming, which give the distance. `detailFields` in
+`src/lib/cardio.ts` decides which extras each activity shows. The builder also has a Cardio preset.
+
 ## Navigation
 
 Home-screen apps have no browser back button, so every screen has a top-left **Back**. It goes to

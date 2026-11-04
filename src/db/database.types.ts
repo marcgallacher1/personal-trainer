@@ -72,6 +72,7 @@ export type Database = {
           completed_at: string
           created_at: string
           deleted_at: string | null
+          details_json: Json
           distance_km: number | null
           duration_seconds: number
           id: string
@@ -88,6 +89,7 @@ export type Database = {
           completed_at?: string
           created_at?: string
           deleted_at?: string | null
+          details_json?: Json
           distance_km?: number | null
           duration_seconds: number
           id?: string
@@ -104,6 +106,7 @@ export type Database = {
           completed_at?: string
           created_at?: string
           deleted_at?: string | null
+          details_json?: Json
           distance_km?: number | null
           duration_seconds?: number
           id?: string
