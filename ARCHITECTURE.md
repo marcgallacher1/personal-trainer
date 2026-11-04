@@ -104,16 +104,29 @@ restores with it. In a workout started from the plan, cardio not logged yet show
 Workouts with only cardio still count as done for adherence and suggestions.
 
 **Cardio details:** each entry can carry optional extras in `cardio_entries.details_json`: speed
-and incline (running, walking), level (gym machines), intervals (rounds, hard and easy seconds),
-and pool length and lengths for swimming, which give the distance. `detailFields` in
+and incline (running, walking), level (gym machines), intervals (rounds, hard and easy seconds,
+plus hard and easy speeds where speed applies), and pool length and lengths for swimming, which
+give the distance. In the logger they sit behind a "+ Add …" link that toggles to "− Hide …";
+hidden values still show in the link so nothing is saved out of sight. A plan's cardio can carry
+the same details, and logging it starts from them. `detailFields` in
 `src/lib/cardio.ts` decides which extras each activity shows. The builder also has a Cardio preset.
 
 ## Navigation
 
 Home-screen apps have no browser back button, so every screen has a top-left **Back**. It goes to
 the previous screen, or to a sensible parent when the app was opened directly on that screen.
-Leaving a workout with nothing logged cancels it, so a mis-tap never leaves an empty workout
-behind.
+Start workout and Log workout open as full screens (`/start`, `/log/new`), not pop-ups.
+
+**Pop-ups (toasts)** sit above the tab bar, all the same height. Swipe one down to dismiss it; it
+won't time out while your finger is on it.
+
+**Empty workouts** (no sets, cardio or notes, `src/lib/logging/empty.ts`) don't stick around:
+
+- Back from one cancels it (with Undo), whether it was live or logged afterwards.
+- Save workout stays greyed out until a set or some cardio is logged.
+- A double tap in the start picker only starts one workout.
+- Shortly after the app opens, empty workouts over 12 hours old are removed
+  (`sweepEmptyWorkouts`), e.g. ones left by switching tabs.
 
 ## Notifications
 
@@ -137,8 +150,9 @@ re-sends its subscription each time it starts.
 
   Volume uses the real load (`src/lib/logging/load.ts`). PBs and strength trends use the stronger side.
 
-- **Rest.** Rest is worked out from when each set was logged, minus about 45 s for doing the set
-  (`src/lib/logging/rest.ts`). A live timer shows while you train. Gaps over 15 minutes aren't rest.
+- **Rest.** Rest is worked out from when each set was logged, minus about a minute for doing the
+  set (`src/lib/logging/rest.ts`), and shown under each set (e.g. "40s rest"). There's no live
+  timer, by choice. Gaps over 15 minutes aren't rest.
 
 ## Coaching
 

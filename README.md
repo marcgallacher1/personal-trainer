@@ -3,9 +3,9 @@
 A personal trainer PWA for you and anyone you invite. Each account only ever sees its own data. It's installed on iPhone via Safari → **Add to Home Screen** and runs
 entirely on free tiers (Supabase and Vercel).
 
-- **Logging:** fast, offline set logging with a rest timer. Workouts are live (Start workout) or entered
+- **Logging:** fast, offline set logging, with the rest taken shown under each set. Workouts are live (Start workout) or entered
   afterwards (Log workout). Weights can mean the total, each dumbbell, or left and right for single-arm moves.
-- **Plans:** a plan builder and editor with drag-to-reorder and version history. Workouts can include cardio (e.g. 20 min running) as well as weights. A plan rating with
+- **Plans:** a plan builder and editor with drag-to-reorder and version history. Workouts can include cardio (e.g. 20 min running) as well as weights, with a Cardio preset. Cardio can record speed, incline, level, intervals and pool lengths, all optional. A plan rating with
   one-tap fixes. "Suggested today" picks the best workout from what's left this week.
 - **Analysis:** Progress charts, plan adherence, PBs and stalls, a rating for every workout, and weekly
   reports with 3 actions for next week.
@@ -209,3 +209,13 @@ src/sw.ts       service worker (precache, offline SPA, push, notificationclick)
 supabase/       migrations, pgTAP tests, Edge Functions (notify, test-push, report-summary)
 scripts/        code generators
 ```
+
+## Known limitations and ideas for v2
+
+- **No food database.** Nutrition logs protein grams only; track food in an app like MyFitnessPal.
+  It has no public API, so there's no import.
+- **No Apple Health import.** Web apps can't read HealthKit; weight and cardio are entered by hand.
+- **One time zone.** Dates and reminders use UK time ().
+- **Invites are added by hand** in the Supabase SQL editor (see Inviting someone).
+- **Ideas:** a Watch-style quick-log view, exercise video links, editable quick-add foods, and a
+  calendar view of protein days.
