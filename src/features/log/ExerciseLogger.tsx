@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { nowIso } from '../../db/write'
 import { ChoiceDialog } from '../../components/ChoiceDialog'
 import { Sheet } from '../../components/Sheet'
 import { showToast } from '../../components/Toast'
-import { describeTarget } from '../../lib/plans/targets'
+import { describeTarget, describeTargets } from '../../lib/plans/targets'
 import { describeTarget as describeGoal, todaysTarget } from '../../lib/adaptive/progression'
 import { resetFor, usePlanChanges } from '../coach/data'
 import { ExerciseList } from '../exercises/ExerciseList'
@@ -25,7 +26,7 @@ import {
   formatSet,
 } from '../../lib/logging/logTypes'
 import { setNumbers } from '../../lib/logging/numbering'
-import { clock, restBefore, SET_SECONDS } from '../../lib/logging/rest'
+import { clock, restBefore } from '../../lib/logging/rest'
 import { asLoadMode, isTimed, type SetType } from '../../lib/logging/types'
 import {
   deleteSet,
@@ -76,6 +77,10 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
   const targets = usePlanTargets(se.plan_exercise_id) ?? []
   const planExercise = usePlanExercise(se.plan_exercise_id)
   const nextTarget = targets[sets.length]
+  // Past the planned sets, keep showing the plan's working target
+  const shownTarget = nextTarget ?? targets.filter((t) => t.set_type !== 'warmup').at(-1)
+  const plannedWorking = targets.filter((t) => t.set_type !== 'warmup')
+  const doneWorking = sets.filter((x) => x.set_type !== 'warmup').length
   const library = useExercises()
   const [swapping, setSwapping] = useState(false)
   const [swapTo, setSwapTo] = useState<Exercise | null>(null)
@@ -85,7 +90,6 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
     .filter((e): e is Exercise => Boolean(e))
   // Today's target (a hint; inputs still start blank)
   const planChanges = usePlanChanges()
-  const plannedWorking = targets.filter((t) => t.set_type !== 'warmup')
   const goal = todaysTarget({
     last:
       previous?.sets.map((s) => ({
@@ -117,7 +121,11 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
   async function submitNew(v: EditorValue, close: boolean) {
     const { id, prs } = await logSet(se, v, v.rir, logType, nextTarget?.id ?? null)
     const label = v.set_type === 'warmup' ? 'Warm-up' : `Set ${nextNumber}`
-    const text = `${label} logged · ${formatSet(v, logType, loadMode)}`
+    // Rough rest since the last set of the workout (live workouts only)
+    const rest = lastSetAt ? restBefore(lastSetAt, nowIso()) : null
+    const text = `${label} logged · ${formatSet(v, logType, loadMode)}${
+      rest !== null ? ` · ${clock(rest)} rest` : ''
+    }`
     if (prs[0]) showToast({ message: describePR(prs[0]), tone: 'celebrate' })
     if (close) {
       if (!prs[0]) showToast({ message: `✓ ${text}` })
@@ -200,7 +208,12 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
           </section>
         )}
 
-        {lastSetAt && <RestTimer since={lastSetAt} />}
+        {plannedWorking.length > 0 && (
+          <p className="-mb-2 text-sm text-muted">
+            Plan: <b className="text-text">{describeTargets(targets, logType)}</b> ·{' '}
+            {Math.min(doneWorking, plannedWorking.length)} of {plannedWorking.length} done
+          </p>
+        )}
 
         {/* Logged sets */}
         <section>
@@ -328,7 +341,7 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
             heading={
               nextInitial.set_type === 'warmup' ? 'Next: warm-up set' : `Next: set ${nextNumber}`
             }
-            target={nextTarget ? describeTarget(nextTarget, logType) : undefined}
+            target={shownTarget ? describeTarget(shownTarget, logType) : undefined}
             initial={nextInitial}
             submitLabel={
               nextInitial.set_type === 'warmup' ? 'Log warm-up' : `Log set ${nextNumber}`
@@ -451,27 +464,5 @@ function restLabel(prev: SetRow, cur: SetRow) {
   const r = restBefore(prev.completed_at, cur.completed_at)
   return r === null ? null : (
     <span className="text-[10px] font-normal text-muted tabular-nums">rest {clock(r)}</span>
-  )
-}
-
-/** Live count of time since the last set, taking off ~45 s for doing it. */
-function RestTimer({ since }: { since: string }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const elapsed = (now - Date.parse(since)) / 1000
-  // Over 15 minutes: you're not resting, you've moved on
-  if (elapsed > 15 * 60) return null
-  const rest = Math.max(0, elapsed - SET_SECONDS)
-  return (
-    <p
-      role="timer"
-      className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 text-sm"
-    >
-      <span className="text-muted">Resting since your last set</span>
-      <span className="text-lg font-bold tabular-nums">{clock(rest)}</span>
-    </p>
   )
 }

@@ -199,12 +199,48 @@ const pushDone = logged('a', MON, [['Barbell Bench Press', 3, 60]], 'Push')
 const pullDone = logged('b', addDays(MON, 1), [['Lat Pulldown', 3, 50]], 'Pull')
 
 describe('missed workouts', () => {
-  it('offers to move it to the next free day or fold its key lifts into the next workout', () => {
-    // Fri: Legs (Thu) was missed; Sat and Sun are free; no workout left this week
-    const [p, ...rest] = buildProposals(proposalInput({ sessions: [pushDone, pullDone] }))
-    expect(rest).toEqual([])
-    expect(p).toMatchObject({ key: `missed:Legs:${addDays(MON, 3)}`, title: 'You missed Legs' })
-    expect(p!.options.map((o) => o.label)).toEqual(['Do it today'])
+  it('stays quiet about a missed workout that Start workout already suggests today', () => {
+    // Fri: Legs (Thu) was missed and is today's suggestion, so no card
+    expect(buildProposals(proposalInput({ sessions: [pushDone, pullDone] }))).toEqual([])
+  })
+
+  it('drops a missed workout once you do it later, even the same day', () => {
+    // Tue's pull was missed; done Wed evening (started from the plan, or a close match)
+    const fromPlan = logged('w', addDays(MON, 2), [['Lat Pulldown', 3, 50]], 'Pull')
+    const custom = logged('x', addDays(MON, 2), [
+      ['Lat Pulldown', 3, 50],
+      ['Barbell Row', 3, 60],
+    ])
+    for (const done of [fromPlan, custom]) {
+      const p = buildProposals(
+        proposalInput({ today: addDays(MON, 2), sessions: [pushDone, done] }),
+      )
+      expect(p.filter((x) => x.kind === 'missed').map((x) => x.title)).toEqual([])
+    }
+  })
+
+  it('never folds lifts into a workout already done this week', () => {
+    // The user's week: Mon push missed, done Tue instead; Tue pull missed. Wed: a 2nd push day
+    const PUSH_B = workout('Push B', [3], ['Incline Dumbbell Press', 'Dumbbell Shrug'])
+    const workouts = [PUSH, PULL, PUSH_B, LEGS]
+    const input = proposalInput({
+      today: addDays(MON, 2),
+      sessions: [logged('t', addDays(MON, 1), [['Barbell Bench Press', 4, 60]], 'Push')],
+    })
+    input.plan = { ...input.plan, workouts }
+    // Pull is today's suggestion: no card for it
+    expect(buildProposals(input).filter((p) => p.kind === 'missed')).toEqual([])
+
+    // Trained pull today already: Push B (Wed, still to do) is the only fold target
+    input.sessions = [
+      ...input.sessions,
+      logged('w', addDays(MON, 2), [['Lat Pulldown', 4, 50]], 'Pull'),
+    ]
+    for (const p of buildProposals(input).filter((x) => x.kind === 'missed')) {
+      for (const o of p.options) {
+        if (o.action.kind === 'fold') expect(o.action.intoWorkoutId).not.toBe('Push')
+      }
+    }
   })
 
   it('suggests a later day if you’ve already trained today, and folds into the next workout', () => {

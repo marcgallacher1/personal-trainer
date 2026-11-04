@@ -122,10 +122,10 @@ describe('go to the gym', () => {
     expect(keys(state(`${MON}T15:05:00Z`, { sent: new Set([`gym:${MON}:15:00`]) }))).toEqual([])
   })
 
-  it('names the planned workout', () => {
+  it('never names a workout (the plan shifts day to day)', () => {
     const [d] = dueNotifications(state(`${MON}T15:00:00Z`))
-    expect(d!.title).toBe('Push A today 🏋️')
-    expect(d!.body).toContain('Push A')
+    expect(d!.title).toBe('Training today 🏋️')
+    expect(d!.body).not.toContain('Push A')
   })
 
   it('stays quiet on rest days, but covers every day with no plan (Sat 10:00, Sun 13:00)', () => {
@@ -177,7 +177,8 @@ describe('other reminders', () => {
   it('flags a missed plan workout at 20:00 and suggests another day', () => {
     // Tue: Pull A not started; Wed is free
     const [d] = dueNotifications(state('2026-11-03T20:00:00Z'))
-    expect(d).toMatchObject({ key: 'missed:2026-11-03', title: 'Pull A not started 📅' })
+    expect(d).toMatchObject({ key: 'missed:2026-11-03', title: 'Not trained yet 📅' })
+    expect(d!.body).not.toContain('Pull A')
     expect(d!.body).toContain('Tomorrow morning’s free')
     expect(
       keys(state('2026-11-03T20:00:00Z', { workoutToday: true })).filter((k) =>

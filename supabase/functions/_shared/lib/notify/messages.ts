@@ -6,42 +6,42 @@ type Pool = Record<'chill' | 'motivational' | 'drill', string[]>
 
 /** {workout}, {goal}, {days}, {grams}, {pb} and {weeks} are filled in. */
 export const POOLS: Partial<Record<NotifyType | 'gym_followup' | 'bodyweight_followup', Pool>> = {
-  // A heads-up for later (e.g. after work), never "go now"
+  // Generic on purpose: the plan shifts day to day, so never name a workout
   gym: {
     chill: [
-      '{workout} is on later. Don’t forget 👋',
-      'Heads up: {workout} after work today.',
-      'Gentle reminder: {workout} later today.',
+      'Training later. Don’t forget 👋',
+      'Heads up: gym after work today.',
+      'Gentle reminder: you’ve got a session later.',
     ],
     motivational: [
-      '{workout} later. Let’s make it a good one 💪',
-      'Don’t forget {workout} after work. Every session counts.',
-      'Future you will thank you. {workout} later today.',
-      'You’ve built the plan, now run it. {workout} later.',
-      'Reminder: {workout} today. Show up and do the work.',
+      'Session later. Let’s make it a good one 💪',
+      'Don’t forget the gym after work. Every session counts.',
+      'Future you will thank you. Gym later today.',
+      'You’ve built the plan, now run it. Session later.',
+      'Reminder: training today. Show up and do the work.',
     ],
     drill: [
-      '{workout} later. No excuses.',
-      'Bag packed? {workout} after work. Don’t skip it.',
-      'Don’t talk yourself out of {workout} later.',
-      'Excuses don’t build muscle. {workout} later today.',
-      'You said you’d train. {workout} later. Be there.',
+      'Gym later. No excuses.',
+      'Bag packed? Gym after work. Don’t skip it.',
+      'Don’t talk yourself out of it later.',
+      'Excuses don’t build muscle. Training later today.',
+      'You said you’d train. Later today. Be there.',
     ],
   },
   gym_followup: {
     chill: [
       'Been to the gym yet? If you’re done, log it. If not, there’s still time.',
-      'Still on for {workout}? Log it if you’ve been.',
+      'Still on for today? Log it if you’ve been.',
     ],
     motivational: [
-      'Either log {workout} or get it done. You’ve got this.',
+      'Either log it or get it done. You’ve got this.',
       'Nothing logged yet. Smashed it already? Log it. If not, go now.',
-      'Still time for {workout}. Make today count.',
+      'Still time to train. Make today count.',
     ],
     drill: [
       'Nothing logged. In the gym? Log it. On the sofa? Get up.',
-      '{workout} still missing. Log it or go. Your call, no excuses.',
-      'Clock’s ticking. Log {workout} or get moving.',
+      'Still nothing logged. Log it or go. Your call, no excuses.',
+      'Clock’s ticking. Log it or get moving.',
     ],
   },
   log_session: {
@@ -56,15 +56,12 @@ export const POOLS: Partial<Record<NotifyType | 'gym_followup' | 'bodyweight_fol
     ],
   },
   missed_workout: {
-    chill: ['No {workout} today, that’s ok. {reschedule}'],
+    chill: ['No workout today, that’s ok. {reschedule}'],
     motivational: [
-      'Not started {workout} yet. {reschedule}',
-      'Missed {workout}? One day doesn’t break you. {reschedule}',
+      'Not trained yet today. {reschedule}',
+      'Missed today? One day doesn’t break you. {reschedule}',
     ],
-    drill: [
-      '{workout} hasn’t happened. {reschedule}',
-      'Skipped {workout}? Make it up. {reschedule}',
-    ],
+    drill: ['No session today. {reschedule}', 'Skipped today? Make it up. {reschedule}'],
   },
   protein: {
     chill: ['Protein check: {grams}', 'How’s protein going? {grams}'],

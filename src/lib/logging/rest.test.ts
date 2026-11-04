@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { clock, restBefore } from './rest'
 
 describe('rest between sets', () => {
-  it('takes off ~45 s for doing the set', () => {
-    expect(restBefore('2026-11-03T18:00:00Z', '2026-11-03T18:02:30Z')).toBe(105)
+  it('takes off a minute for doing the set', () => {
+    expect(restBefore('2026-11-03T18:00:00Z', '2026-11-03T18:02:30Z')).toBe(90)
     expect(restBefore('2026-11-03T18:00:00Z', '2026-11-03T18:00:30Z')).toBe(0)
   })
 

@@ -1,7 +1,7 @@
 /** Rest between sets, from when each set was logged. */
 
-/** Rough time to actually do a set and open the app (you log right after finishing). */
-export const SET_SECONDS = 45
+/** Rough time to do a set and log it; rest is the gap minus this. */
+export const SET_SECONDS = 60
 /** Longer gaps are a break or a different exercise, not rest. */
 const MAX_REST_SECONDS = 15 * 60
 

@@ -100,7 +100,6 @@ export function dueNotifications(s: NotifyState): Due[] {
   const goal =
     s.goal && goalDays !== null && goalDays > 0 ? { name: s.goal.name, days: goalDays } : null
   const planned = s.plan?.days[today.weekday] ?? []
-  const workoutName = planned.length ? planned.join(' + ') : 'Your workout'
   const paused = s.pausedUntil !== null && Date.parse(s.pausedUntil) > now
   const quietNow = inQuietHours(today.minutes, s.quiet)
 
@@ -161,8 +160,8 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'gym',
             `gym:${today.date}:${t}`,
-            planned.length ? `${workoutName} today 🏋️` : 'Time to train 🏋️',
-            { pool: 'gym', vars: { workout: workoutName } },
+            'Training today 🏋️',
+            { pool: 'gym', vars: {} },
             '/',
             r.skipIfLogged && s.workoutToday ? 'already logged' : undefined,
           )
@@ -174,7 +173,7 @@ export function dueNotifications(s: NotifyState): Due[] {
             'gym',
             `gym:${today.date}:f${t}`,
             'Log it or go ⏰',
-            { pool: 'gym_followup', vars: { workout: workoutName } },
+            { pool: 'gym_followup', vars: {} },
             s.openWorkout ? `/log/session/${s.openWorkout.id}` : '/',
             s.workoutToday ? 'already logged' : undefined,
           )
@@ -205,11 +204,10 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'missed_workout',
             `missed:${today.date}`,
-            `${workoutName} not started 📅`,
+            'Not trained yet 📅',
             {
               pool: 'missed_workout',
               vars: {
-                workout: workoutName,
                 reschedule: r.suggestReschedule ? reschedule(s.plan, today.weekday) : '',
               },
             },
