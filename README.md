@@ -215,7 +215,7 @@ scripts/        code generators
 - **No food database.** Nutrition logs protein grams only; track food in an app like MyFitnessPal.
   It has no public API, so there's no import.
 - **No Apple Health import.** Web apps can't read HealthKit; weight and cardio are entered by hand.
-- **One time zone.** Dates and reminders use UK time ().
+- **One time zone.** Dates and reminders use UK time (`Europe/London`).
 - **Invites are added by hand** in the Supabase SQL editor (see Inviting someone).
 - **Ideas:** a Watch-style quick-log view, exercise video links, editable quick-add foods, and a
   calendar view of protein days.
