@@ -453,11 +453,12 @@ export function DetailsEditor({
           )}
           {has('intervals') && (
             <Field label="Intervals" hint="Optional. E.g. 6 rounds of 1 min hard, 90 s easy.">
-              <div className="grid grid-cols-3 gap-2">
+              <div className={`grid grid-cols-3 gap-2 ${has('speed') ? 'grid-rows-2' : ''}`}>
                 <IntervalBox
                   label="Rounds"
                   value={n(value.rounds)}
                   step={1}
+                  tall={has('speed')}
                   onChange={(v) => set({ rounds: v })}
                 />
                 <IntervalBox
@@ -466,12 +467,30 @@ export function DetailsEditor({
                   step={15}
                   onChange={(v) => set({ workSeconds: v })}
                 />
+                {has('speed') && (
+                  <IntervalBox
+                    label="Hard (km/h)"
+                    value={n(value.hardSpeedKmh)}
+                    step={0.5}
+                    decimals
+                    onChange={(v) => set({ hardSpeedKmh: v })}
+                  />
+                )}
                 <IntervalBox
                   label="Easy (sec)"
                   value={n(value.restSeconds)}
                   step={15}
                   onChange={(v) => set({ restSeconds: v })}
                 />
+                {has('speed') && (
+                  <IntervalBox
+                    label="Easy (km/h)"
+                    value={n(value.easySpeedKmh)}
+                    step={0.5}
+                    decimals
+                    onChange={(v) => set({ easySpeedKmh: v })}
+                  />
+                )}
               </div>
             </Field>
           )}
@@ -481,36 +500,46 @@ export function DetailsEditor({
   )
 }
 
-/** A small number box for the interval rounds and seconds. */
+/** A small number box for interval rounds, seconds or speed. */
 function IntervalBox({
   label,
   value,
   step,
+  decimals = false,
+  tall = false,
   onChange,
 }: {
   label: string
   value: number
   step: number
+  /** Allow one decimal place (speeds) */
+  decimals?: boolean
+  /** Fill two rows (Rounds next to the hard and easy rows) */
+  tall?: boolean
   onChange: (v: number) => void
 }) {
+  const tidy = (v: number) =>
+    Math.max(0, Math.min(3600, decimals ? Math.round(v * 10) / 10 : Math.round(v)))
   return (
-    <label className="flex flex-col items-center gap-1 rounded-xl bg-surface p-2">
+    <label
+      className={`flex flex-col items-center gap-1 rounded-xl bg-surface p-2 ${
+        tall ? 'row-span-2 justify-center' : ''
+      }`}
+    >
       <span className="text-xs font-semibold text-muted">{label}</span>
       <input
-        inputMode="numeric"
+        inputMode={decimals ? 'decimal' : 'numeric'}
         value={value || ''}
         placeholder="–"
         onFocus={(e) => e.target.select()}
-        onChange={(e) =>
-          onChange(Math.max(0, Math.min(3600, Math.round(Number(e.target.value) || 0))))
-        }
+        onChange={(e) => onChange(tidy(Number(e.target.value) || 0))}
         className="h-10 w-full bg-transparent text-center text-xl font-bold tabular-nums outline-none"
       />
       <span className="flex gap-1">
         <button
           type="button"
           aria-label={`Less ${label}`}
-          onClick={() => onChange(Math.max(0, value - step))}
+          onClick={() => onChange(tidy(value - step))}
           className="h-8 w-8 rounded-lg bg-surface-2 font-bold"
         >
           −
@@ -518,7 +547,7 @@ function IntervalBox({
         <button
           type="button"
           aria-label={`More ${label}`}
-          onClick={() => onChange(value + step)}
+          onClick={() => onChange(tidy(value + step))}
           className="h-8 w-8 rounded-lg bg-surface-2 font-bold"
         >
           +

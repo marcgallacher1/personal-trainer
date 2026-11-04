@@ -115,7 +115,17 @@ describe('cardio details', () => {
   it('summarises in plain words', () => {
     expect(
       detailsSummary({ speedKmh: 8.5, inclinePct: 5, rounds: 6, workSeconds: 60, restSeconds: 90 }),
-    ).toBe('8.5 km/h · 5% incline · 6 × 1 min on, 90s off')
+    ).toBe('8.5 km/h · 5% incline · 6 × 1 min, 90s easy')
+    expect(
+      detailsSummary({
+        rounds: 6,
+        workSeconds: 60,
+        restSeconds: 90,
+        hardSpeedKmh: 14,
+        easySpeedKmh: 8,
+      }),
+    ).toBe('6 × 1 min at 14 km/h, 90s at 8 km/h easy')
+    expect(cleanDetails('row', { rounds: 4, hardSpeedKmh: 14 })).toEqual({ rounds: 4 })
     expect(detailsSummary({ poolLengthM: 25, lengths: 40 })).toBe('40 × 25 m')
     expect(detailsSummary({})).toBe('')
   })

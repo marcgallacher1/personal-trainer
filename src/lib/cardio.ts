@@ -153,6 +153,9 @@ export interface CardioDetails {
   rounds?: number
   workSeconds?: number
   restSeconds?: number
+  /** Speed during the hard and easy parts (running, walking, cycling) */
+  hardSpeedKmh?: number
+  easySpeedKmh?: number
   poolLengthM?: number
   lengths?: number
 }
@@ -198,6 +201,8 @@ const NUM_KEYS = [
   'rounds',
   'workSeconds',
   'restSeconds',
+  'hardSpeedKmh',
+  'easySpeedKmh',
   'poolLengthM',
   'lengths',
 ] as const
@@ -224,6 +229,7 @@ export function cleanDetails(activity: string, d: CardioDetails): CardioDetails 
       rounds: d.rounds,
       workSeconds: d.workSeconds,
       restSeconds: d.restSeconds,
+      ...(f.has('speed') && { hardSpeedKmh: d.hardSpeedKmh, easySpeedKmh: d.easySpeedKmh }),
     }),
     ...(f.has('pool') && { poolLengthM: d.poolLengthM, lengths: d.lengths }),
   }
@@ -235,6 +241,7 @@ export function swimKm(d: CardioDetails): number | null {
   return d.poolLengthM && d.lengths ? Math.round(d.poolLengthM * d.lengths) / 1000 : null
 }
 
+const at = (kmh?: number) => (kmh ? ` at ${kmh} km/h` : '')
 const secs = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${s}s`)
 
 /** "8.5 km/h · 5% incline · 6 × 1 min on, 90s off" / "40 × 25 m" */
@@ -246,8 +253,8 @@ export function detailsSummary(d: CardioDetails): string {
   if (d.inclinePct) parts.push(`${d.inclinePct}% incline`)
   if (d.level) parts.push(`level ${d.level}`)
   if (d.rounds) {
-    const on = d.workSeconds ? ` × ${secs(d.workSeconds)} on` : ' rounds'
-    const off = d.restSeconds ? `, ${secs(d.restSeconds)} off` : ''
+    const on = d.workSeconds ? ` × ${secs(d.workSeconds)}${at(d.hardSpeedKmh)}` : ' rounds'
+    const off = d.restSeconds ? `, ${secs(d.restSeconds)}${at(d.easySpeedKmh)} easy` : ''
     parts.push(`${d.rounds}${on}${off}`)
   }
   return parts.join(' · ')
