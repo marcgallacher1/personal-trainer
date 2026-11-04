@@ -4,6 +4,7 @@ import { db } from '../../db/local'
 import type { Exercise, Session, SessionExercise } from '../../db/queries'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, save, saveOne, type Change } from '../../db/write'
+import { isAbandoned, isEmptyWorkout } from '../../lib/logging/empty'
 import { isTimed, type LogType } from '../../lib/logging/types'
 import {
   buildPlanFromDraft,
@@ -645,19 +646,44 @@ export async function setMuscleFlags(
 
 // --- Leaving a workout ---
 
-/** Deletes a workout with nothing logged. Returns true if it did. */
-export async function discardIfEmpty(sessionId: string): Promise<boolean> {
-  const session = await db.sessions.get(sessionId)
-  if (!session || session.deleted_at || session.ended_at) return false
+/** A workout's live sets, cardio and exercises. */
+async function contentOf(sessionId: string) {
   const [sets, cardio, items] = await Promise.all([
     db.sets.where('session_id').equals(sessionId).toArray(),
     db.cardio_entries.where('session_id').equals(sessionId).toArray(),
     db.session_exercises.where('session_id').equals(sessionId).toArray(),
   ])
-  if (sets.some(live) || cardio.some(live)) return false
-  await save([
-    ...items.filter(live).map((i) => deletion('session_exercises', i)),
+  return { sets: sets.filter(live), cardio: cardio.filter(live), items: items.filter(live) }
+}
+
+/**
+ * Deletes a workout with nothing logged, live or logged afterwards. Returns the changes (for
+ * Undo), or null if it was kept.
+ */
+export async function discardIfEmpty(sessionId: string): Promise<Change[] | null> {
+  const session = await db.sessions.get(sessionId)
+  if (!session || session.deleted_at) return null
+  const c = await contentOf(sessionId)
+  if (!isEmptyWorkout({ notes: session.notes, sets: c.sets.length, cardio: c.cardio.length }))
+    return null
+  const changes = [
+    ...c.items.map((i) => deletion('session_exercises', i)),
     deletion('sessions', session),
-  ])
-  return true
+  ]
+  await save(changes)
+  return changes
+}
+
+/** Removes empty workouts over 12 hours old (e.g. left via the tab bar). Returns how many. */
+export async function sweepEmptyWorkouts(): Promise<number> {
+  const sessions = (await db.sessions.toArray()).filter(live)
+  const now = Date.now()
+  let removed = 0
+  for (const s of sessions) {
+    const c = await contentOf(s.id)
+    const content = { notes: s.notes, sets: c.sets.length, cardio: c.cardio.length }
+    if (isAbandoned({ ...content, created_at: s.created_at }, now) && (await discardIfEmpty(s.id)))
+      removed++
+  }
+  return removed
 }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, ScrollRestoration, useNavigate } from 'react-router'
 import { SyncPill } from '../components/SyncPill'
 import { ToastHost } from '../components/Toast'
+import { sweepEmptyWorkouts } from '../features/plans/data'
 import { TabBar } from './TabBar'
 
 export function Layout() {
@@ -16,6 +17,12 @@ export function Layout() {
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [navigate])
+
+  // Shortly after opening (once the first sync has run), tidy away old empty workouts
+  useEffect(() => {
+    const t = setTimeout(() => void sweepEmptyWorkouts(), 5000)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <div className="min-h-full pt-safe">

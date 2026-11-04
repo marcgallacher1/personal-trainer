@@ -271,9 +271,18 @@ describe('plans round-trip', () => {
     expect(await db.outbox.count()).toBe(0)
   })
 
+  it('cancels an empty workout logged afterwards too', async () => {
+    const past = await startSession({
+      startedAt: '2026-11-04T18:00:00Z',
+      endedAt: '2026-11-04T19:00:00Z',
+    })
+    expect(await discardIfEmpty(past)).not.toBeNull()
+    expect((await db.sessions.get(past))?.deleted_at).not.toBeNull()
+  })
+
   it('cancels an empty workout on leaving, but keeps one with sets', async () => {
     const empty = await startSession()
-    expect(await discardIfEmpty(empty)).toBe(true)
+    expect(await discardIfEmpty(empty)).not.toBeNull()
     expect((await db.sessions.get(empty))?.deleted_at).not.toBeNull()
 
     const used = await startSession()
@@ -281,7 +290,7 @@ describe('plans round-trip', () => {
     await addExercise(used, bench)
     const se = (await db.session_exercises.where('session_id').equals(used).toArray())[0]!
     await logSet(se, { weight_kg: 60, reps: 8, duration_seconds: null, set_type: 'working' }, null)
-    expect(await discardIfEmpty(used)).toBe(false)
+    expect(await discardIfEmpty(used)).toBeNull()
     expect((await db.sessions.get(used))?.deleted_at).toBeNull()
   })
 })

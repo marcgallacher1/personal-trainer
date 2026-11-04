@@ -146,7 +146,12 @@ export function SessionScreen() {
           fallback="/"
           onBack={async () => {
             // Nothing logged? Don't leave an empty workout behind.
-            if (await discardIfEmpty(session.id)) showToast({ message: 'Empty workout cancelled' })
+            const removed = await discardIfEmpty(session.id)
+            if (removed)
+              showToast({
+                message: 'Empty workout cancelled',
+                action: { label: 'Undo', onClick: () => void undoDeletion(removed) },
+              })
           }}
         />
         <input
@@ -300,7 +305,8 @@ export function SessionScreen() {
       {active ? (
         <Button
           className="h-16 text-xl"
-          disabled={list.length === 0 && cardioList.length === 0}
+          // Greyed out until a set or some cardio is logged
+          disabled={allSets.length === 0 && cardioList.length === 0}
           onClick={async () => {
             await finishSession(session)
             showToast({

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../../components/Button'
 import { BackButton } from '../../components/BackButton'
@@ -24,6 +24,7 @@ function useStartChoices(past: boolean) {
   const exercises = useExercises()
   const training = useTrainingData()
   const extras = todayExtras(usePlanChanges())
+  const starting = useRef(false)
   const [now] = useState(() => new Date())
   const todayDate = londonDate(now.toISOString())
   const today = isoWeekday(todayDate)
@@ -96,7 +97,12 @@ function useStartChoices(past: boolean) {
   }
 
   async function go(start: () => Promise<string>) {
-    const id = await start()
+    // A quick double tap only starts one workout
+    if (starting.current) return
+    starting.current = true
+    const id = await start().finally(() => {
+      starting.current = false
+    })
     // Replace the picker, so Back from the workout returns to where you started
     void navigate(`/log/session/${id}`, { replace: true })
   }
