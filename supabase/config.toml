@@ -407,8 +407,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 project_id = "aypgvqsdllsmsehiyzgm"
 
 [remotes.production.auth]
-# Single-user app: no new registrations once the owner account exists.
-enable_signup = false
+# Sign-up is on, but only for emails in public.invites (see the invites migration).
+enable_signup = true
+minimum_password_length = 8
 site_url = "https://personal-trainer-marcgallacher1s-projects.vercel.app/"
 additional_redirect_urls = [
   "https://personal-trainer-marcgallacher1s-projects.vercel.app/",

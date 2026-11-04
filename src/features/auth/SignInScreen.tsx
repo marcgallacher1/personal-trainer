@@ -4,6 +4,13 @@ import { Button } from '../../components/Button'
 
 type Mode = 'sign-in' | 'create'
 
+/** Sign-up is invite-only; the database turns away other emails with a generic error. */
+function signUpError(message: string) {
+  return /not_invited|database error saving new user/i.test(message)
+    ? 'This email isn’t invited yet. Ask whoever shared the app with you to add it.'
+    : message
+}
+
 /** Email + password sign-in (email links would open in Safari, not the home-screen app). */
 export function SignInScreen() {
   const [mode, setMode] = useState<Mode>('sign-in')
@@ -22,7 +29,7 @@ export function SignInScreen() {
         ? await supabase.auth.signUp(credentials)
         : await supabase.auth.signInWithPassword(credentials)
     setBusy(false)
-    if (err) setError(err.message)
+    if (err) setError(mode === 'create' ? signUpError(err.message) : err.message)
     else if (!data.session) setError('Account created but not signed in. Try signing in.')
     // On success AuthProvider receives the session and the app opens.
   }
@@ -71,7 +78,7 @@ export function SignInScreen() {
             setError(null)
           }}
         >
-          {creating ? 'I already have an account' : 'First time? Create an account'}
+          {creating ? 'I already have an account' : 'Been invited? Create an account'}
         </button>
       </form>
 

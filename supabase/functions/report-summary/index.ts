@@ -14,6 +14,20 @@ balance notes, protein) and the 3 actions already chosen for next week.
 Write 3 to 4 short sentences in plain British English: what went well, what didn't, and why the
 actions matter. Use only the numbers given. No headings, lists, emoji or sign-off.`
 
+const MAX_INPUT_CHARS = 20_000
+
+/** '2026-W44' for this week or one of the last 4. */
+function isRecentWeek(isoWeek: string): boolean {
+  const m = /^(\d{4})-W(\d{2})$/.exec(isoWeek)
+  if (!m) return false
+  // Monday of ISO week 1 is the Monday on or before 4 Jan
+  const jan4 = Date.UTC(Number(m[1]), 0, 4)
+  const week1 = jan4 - ((new Date(jan4).getUTCDay() + 6) % 7) * 86_400_000
+  const monday = week1 + (Number(m[2]) - 1) * 7 * 86_400_000
+  const ageDays = (Date.now() - monday) / 86_400_000
+  return Number(m[2]) >= 1 && Number(m[2]) <= 53 && ageDays >= 0 && ageDays < 35
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const key = Deno.env.get('ANTHROPIC_API_KEY')
@@ -25,16 +39,28 @@ Deno.serve(async (req) => {
   if (!auth.user) return Response.json({ error: 'Not signed in' }, { status: 401, headers: CORS })
 
   const { iso_week } = (await req.json().catch(() => ({}))) as { iso_week?: string }
+  // Your API key pays for this, so only recent real weeks, and only once each (cached below)
+  if (!iso_week || !isRecentWeek(iso_week))
+    return Response.json({ summary: null }, { status: 400, headers: CORS })
   const { data: report } = await db
     .from('weekly_reports')
     .select('id, stats_json, recommendations_json, summary_text, llm_summary_text')
     .eq('user_id', auth.user.id)
-    .eq('iso_week', iso_week ?? '')
+    .eq('iso_week', iso_week)
     .is('deleted_at', null)
     .maybeSingle()
   if (!report) return Response.json({ summary: null }, { headers: CORS })
   if (report.llm_summary_text)
     return Response.json({ summary: report.llm_summary_text }, { headers: CORS })
+
+  const content = JSON.stringify({
+    headline: report.summary_text,
+    week: report.stats_json,
+    actions: report.recommendations_json,
+  })
+  // A real report is a few KB; anything bigger was written by hand
+  if (content.length > MAX_INPUT_CHARS)
+    return Response.json({ summary: null }, { status: 413, headers: CORS })
 
   const client = new Anthropic({ apiKey: key })
   try {
@@ -43,16 +69,7 @@ Deno.serve(async (req) => {
       max_tokens: 2000,
       output_config: { effort: 'low' },
       system: SYSTEM,
-      messages: [
-        {
-          role: 'user',
-          content: JSON.stringify({
-            headline: report.summary_text,
-            week: report.stats_json,
-            actions: report.recommendations_json,
-          }),
-        },
-      ],
+      messages: [{ role: 'user', content }],
     })
     if (res.stop_reason === 'refusal') return Response.json({ summary: null }, { headers: CORS })
     const summary = res.content
@@ -64,7 +81,8 @@ Deno.serve(async (req) => {
     return Response.json({ summary }, { headers: CORS })
   } catch (e) {
     // The rules-based report still shows; this is just extra
-    const message = e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : String(e)
-    return Response.json({ summary: null, error: message }, { headers: CORS })
+    // Logged on the server only; the phone doesn't need the details
+    console.error(e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : String(e))
+    return Response.json({ summary: null }, { headers: CORS })
   }
 })

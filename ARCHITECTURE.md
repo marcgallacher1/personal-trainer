@@ -29,7 +29,7 @@ iPhone (standalone PWA)
   stops at the first failure, because later writes may depend on earlier ones (a set depends on its
   session).
 - **Server-owned `updated_at`.** A trigger sets it on every write, which makes it a safe cursor for
-  pulls. Conflicts resolve last-write-wins, which is fine for a single user on a few devices.
+  pulls. Conflicts resolve last-write-wins, which is fine for one person on a few devices.
 - **Soft deletes** (`deleted_at`). Deletes sync like any other change and make undo possible.
 - **RLS everywhere.** Every user table carries `user_id` (defaulting to `auth.uid()`), including child
   tables, so the policy is always the same `user_id = auth.uid()`. The seeded catalogue rows have
@@ -52,8 +52,11 @@ iPhone (standalone PWA)
 Sign-in uses Supabase email and password, with "Confirm email" turned off. Email links aren't usable:
 on iOS they open in Safari, which can't share its storage with the Home Screen app. Supabase's free
 tier also can't customise emails to send codes instead. The session is persisted in `localStorage`
-under `trainer-auth` and refreshes automatically, so you sign in once per device. Once your account
-exists, sign-ups are disabled on the hosted project, so it stays single-user.
+under `trainer-auth` and refreshes automatically, so you sign in once per device. Sign-up is
+invite-only: a `before insert` trigger on `auth.users` (`check_invite`) rejects any email not
+matched in `public.invites`, which has RLS on and no policies, so only the project owner can edit it.
+Signing out wipes local data and unsubscribes the device from push. If a different account signs in
+on the same phone, `claimLocalData` clears the previous user's data first.
 
 ## Reference data
 

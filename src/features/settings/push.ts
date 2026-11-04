@@ -100,3 +100,21 @@ export async function sendTestPush(): Promise<void> {
   )
   if (error) throw new Error(data?.error ?? error.message)
 }
+
+/** On sign-out: stop this device getting the old account's reminders. Never throws. */
+export async function forgetPushOnThisDevice(): Promise<void> {
+  try {
+    // getRegistration, not .ready: .ready never settles when no service worker is installed
+    const sub = await (
+      await navigator.serviceWorker?.getRegistration()
+    )?.pushManager.getSubscription()
+    if (!sub) return
+    await supabase
+      .from('push_subscriptions')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('endpoint', sub.endpoint)
+    await sub.unsubscribe()
+  } catch {
+    // Signing out matters more than tidying up
+  }
+}

@@ -9,9 +9,11 @@ import { useOutboxCount } from '../../db/queries'
 import { supabase } from '../../db/supabase'
 import { clearLocalData } from '../../db/sync'
 import { useAuth } from '../auth/AuthProvider'
+import { forgetPushOnThisDevice } from '../settings/push'
 import { countSampleWorkouts, loadSampleWorkouts, removeSampleWorkouts } from './sample'
 
 async function signOut() {
+  await forgetPushOnThisDevice()
   await supabase.auth.signOut()
   await clearLocalData()
 }

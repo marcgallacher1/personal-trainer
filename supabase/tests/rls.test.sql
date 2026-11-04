@@ -1,7 +1,7 @@
 -- RLS: each user sees only their own rows, plus the seeded (global) catalogue.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(19);
 
 -- Two users. The signup trigger should create profiles + default muscle targets.
 insert into auth.users (id, email, instance_id, aud, role)
@@ -22,6 +22,12 @@ select throws_ok(
   $$ insert into public.notification_log (user_id, type, idempotency_key, status)
      values ('11111111-1111-1111-1111-111111111111', 'gym', 'gym:2026-11-02:15:00', 'sent') $$,
   '23505', null, 'a reminder is never logged twice for the same user');
+
+-- Sign-up is invite-only (seed.sql invites %@test.local)
+select throws_ok(
+  $$ insert into auth.users (id, email, instance_id, aud, role)
+     values ('33333333-3333-3333-3333-333333333333', 'stranger@example.com', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated') $$,
+  'P0001', 'not_invited', 'an email that is not invited cannot sign up');
 
 -- Act as user A.
 set local role authenticated;
@@ -62,6 +68,8 @@ select throws_ok(
 -- Server-only functions can't be called from the app
 select throws_ok($$ select public.configure_notify('x', 'y') $$, '42501', null, 'clients cannot configure the cron secret');
 select throws_ok($$ select public.run_notify() $$, '42501', null, 'clients cannot trigger notify');
+
+select throws_ok($$ select * from public.invites $$, '42501', null, 'clients cannot read the invite list');
 
 select * from finish();
 rollback;

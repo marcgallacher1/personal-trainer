@@ -1,6 +1,6 @@
 # Trainer
 
-A single-user personal trainer PWA. It's installed on iPhone via Safari → **Add to Home Screen** and runs
+A personal trainer PWA for you and anyone you invite. Each account only ever sees its own data. It's installed on iPhone via Safari → **Add to Home Screen** and runs
 entirely on free tiers (Supabase and Vercel).
 
 - **Logging:** fast, offline set logging with a rest timer. Workouts are live (Start workout) or entered
@@ -82,8 +82,8 @@ fails if the generated migration is out of date.
    hosted overrides (Site URL, redirect URLs, "Confirm email" off). Apply them with `supabase config push`.
    This is the step that turns off "Confirm email" so password sign-up works without an email link.
 4. **Project Settings → API Keys:** copy the Project URL and the publishable key for the next section.
-5. After you've created your own account in the app, set `enable_signup = false` under
-   `[remotes.production.auth]` and run `supabase config push` again, so nobody else can register.
+5. Sign-up is **invite-only**: an account can only be created for an email in `public.invites`
+   (see below). Invite yourself before creating your account.
 
 > **Why password sign-in?** Email links on iOS open in Safari, which can't share its storage with the
 > Home Screen app. On the free tier, Supabase can't customise emails to send a code instead unless
@@ -91,6 +91,20 @@ fails if the generated migration is out of date.
 >
 > Free-tier projects pause after 7 days with no API activity. Normal use of the app (and the
 > notification cron) keeps the project active.
+
+## Inviting someone
+
+1. In the Supabase dashboard, open **SQL Editor** and run:
+   ```sql
+   insert into public.invites (email) values ('friend@example.com');
+   ```
+   Use lower case. To remove an invite, `delete from public.invites where email = '...';` (this
+   doesn't delete an account they've already made; do that under **Authentication → Users**).
+2. Send them the app link. They follow [Installing on iPhone](#installing-on-iphone) and tap
+   **Been invited? Create an account**, using that email.
+
+Everyone else gets "This email isn't invited yet". Their data is private to them: row-level security
+means each account can only read and write its own rows.
 
 ## Deploying to Vercel
 
@@ -101,7 +115,11 @@ fails if the generated migration is out of date.
    - `VITE_SUPABASE_ANON_KEY`: your hosted anon/publishable key
 4. Deploy. Every push to `main` redeploys.
 
-`vercel.json` adds the SPA rewrite and makes sure `sw.js`, the manifest and `index.html` are never cached
+**Let other people open it:** in Vercel, **Settings → Deployment Protection**, turn off **Vercel
+Authentication**. Otherwise the app link shows a Vercel login first. The app has its own sign-in,
+and your data is protected by Supabase, not by Vercel.
+
+`vercel.json` adds security headers (a strict Content Security Policy, no framing) and the SPA rewrite and makes sure `sw.js`, the manifest and `index.html` are never cached
 stale.
 
 ## Installing on iPhone
@@ -109,7 +127,7 @@ stale.
 1. Open the deployed URL in **Safari** (it must be Safari).
 2. Tap **Share**, then **Add to Home Screen**, then **Add**.
 3. Open **Trainer** from the Home Screen. It runs full screen, with no Safari bars.
-4. The first time, tap **Create an account** and choose a password. iCloud Keychain can save it. After
+4. The first time, tap **Been invited? Create an account** and choose a password (8+ characters). iCloud Keychain can save it. After
    that you stay signed in.
 
 Push notifications need iOS 16.4 or later and only work in the Home Screen app.
@@ -156,6 +174,22 @@ Only the report's numbers are sent, never raw logs. To switch it on:
 1. `supabase secrets set ANTHROPIC_API_KEY=...`
 2. `supabase functions deploy report-summary`
 3. Set `VITE_REPORT_AI=on` in Vercel's environment variables and redeploy.
+
+## Security
+
+- **Nothing secret is in the repo.** `.env.local` and `supabase/functions/.env` are git-ignored.
+  The values in the code (Supabase URL, publishable key, VAPID public key) are public by design:
+  the publishable key can only do what row-level security allows.
+- **Server-only secrets** (`VAPID_PRIVATE_KEY`, `NOTIFY_SECRET`, `ANTHROPIC_API_KEY`) are set
+  with `supabase secrets set`. The cron job's copy of `NOTIFY_SECRET` lives in Supabase Vault.
+  Never put them in a `VITE_` variable: those are baked into the app for anyone to read.
+- **Row-level security on every table.** pgTAP tests (`supabase/tests/rls.test.sql`) check one
+  user can't see another's rows, that strangers can't sign up, and that clients can't read the invite
+  list or trigger the cron.
+- **The AI note costs you money** if switched on, since it's your API key. It only accepts the last
+  few weeks, at most once per week each, with a size cap.
+- **Signing out** wipes this phone's local copy and stops its reminders, so a shared phone is safe.
+- Dependabot opens weekly PRs for vulnerable dependencies; `npm audit` should stay clean.
 
 ## Project layout
 
