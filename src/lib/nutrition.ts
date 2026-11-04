@@ -116,12 +116,19 @@ export function weightTrend(weighIns: readonly WeighIn[]): (WeighIn & { avg: num
   })
 }
 
-/** Change in kg from the weigh-in nearest to `days` ago (on or before) to the latest. */
-export function weightChange(weighIns: readonly WeighIn[], days: number): number | null {
+/**
+ * Change in kg to the latest weigh-in, from the one nearest `days` before it (on or before), or
+ * from the first weigh-in if they don't go back that far. `from` is the date compared against.
+ */
+export function weightChange(
+  weighIns: readonly WeighIn[],
+  days: number,
+): { kg: number; from: string; full: boolean } | null {
   const sorted = weighIns.toSorted((a, b) => a.date.localeCompare(b.date))
   const latest = sorted.at(-1)
-  if (!latest) return null
+  if (!latest || sorted.length < 2) return null
   const since = addDays(latest.date, -days)
   const then = sorted.filter((w) => w.date <= since).at(-1)
-  return then ? Math.round((latest.kg - then.kg) * 10) / 10 : null
+  const base = then ?? sorted[0]!
+  return { kg: Math.round((latest.kg - base.kg) * 10) / 10, from: base.date, full: Boolean(then) }
 }

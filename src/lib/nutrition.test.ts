@@ -70,8 +70,10 @@ describe('weight trend', () => {
   })
 
   it('reports the change over a period', () => {
-    expect(weightChange(weighIns, 28)).toBe(-1.6)
-    expect(weightChange(weighIns, 365)).toBeNull()
+    expect(weightChange(weighIns, 28)).toEqual({ kg: -1.6, from: '2026-10-05', full: true })
+    // Not a year of data yet: compare with the first weigh-in
+    expect(weightChange(weighIns, 365)).toEqual({ kg: -1.6, from: '2026-10-05', full: false })
+    expect(weightChange([{ date: '2026-11-02', kg: 80 }], 28)).toBeNull()
     expect(weightChange([], 28)).toBeNull()
   })
 })

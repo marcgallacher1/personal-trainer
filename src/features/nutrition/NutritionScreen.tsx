@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BackButton } from '../../components/BackButton'
+import { Button } from '../../components/Button'
 import { BarChart } from '../../components/charts/BarChart'
 import { ChartCard } from '../../components/charts/ChartCard'
 import { LineChart } from '../../components/charts/LineChart'
@@ -33,6 +34,8 @@ import {
 
 const SHORT = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 const dayLabel = (d: string) => SHORT.format(new Date(`${d}T12:00:00Z`))
+/** "12 Oct" */
+const shortDay = (d: string) => dayLabel(d).split(' ').slice(1).join(' ')
 
 type Open =
   | { kind: 'food'; food: QuickFood }
@@ -186,57 +189,63 @@ export function NutritionScreen() {
           rows: days.toReversed().map((d) => [d.date, d.grams, target ?? '']),
         }}
       >
-        <BarChart
-          label="Protein per day"
-          bars={days.map((d) => ({
-            key: d.date,
-            label: dayLabel(d.date).split(' ')[1] ?? d.date,
-            values: { protein: d.grams },
-          }))}
-          series={[{ id: 'protein', name: 'Protein', colour: 'var(--color-accent)' }]}
-          format={(v) => `${Math.round(v)} g`}
-          target={target ?? undefined}
-        />
+        {hit.logged ? (
+          <BarChart
+            label="Protein per day"
+            bars={days.map((d) => ({
+              key: d.date,
+              label: dayLabel(d.date).split(' ')[1] ?? d.date,
+              values: { protein: d.grams },
+            }))}
+            series={[{ id: 'protein', name: 'Protein', colour: 'var(--color-accent)' }]}
+            format={(v) => `${Math.round(v)} g`}
+            target={target ?? undefined}
+          />
+        ) : (
+          <p className="py-8 text-center text-sm text-muted">Your daily totals show here.</p>
+        )}
       </ChartCard>
 
       <section className="rounded-3xl bg-surface p-4">
         <h2 className="text-xs font-semibold tracking-wide text-muted uppercase">Bodyweight</h2>
-        <div className="mt-1 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-3xl font-bold tabular-nums">
-              {latest ? `${Number(latest.kg)} kg` : '–'}
+        <div className="mt-1 flex items-baseline justify-between gap-3">
+          <p className="text-3xl font-bold tabular-nums">
+            {latest ? `${Number(latest.kg)} kg` : '–'}
+          </p>
+          {change !== null && (
+            <p className="text-sm font-semibold text-muted tabular-nums">
+              {change.kg > 0 ? '+' : change.kg < 0 ? '−' : ''}
+              {Math.abs(change.kg)} kg{' '}
+              {change.full ? 'in 4 weeks' : `since ${shortDay(change.from)}`}
             </p>
-            <p className="text-sm text-muted">
-              {latest ? dayLabel(latest.date) : 'No weigh-ins yet'}
-              {change !== null && ` · ${change > 0 ? '+' : ''}${change} kg in 4 weeks`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOpen({ kind: 'weight' })}
-            className="h-11 shrink-0 rounded-xl bg-accent px-4 font-semibold text-accent-fg"
-          >
-            Log weight
-          </button>
+          )}
         </div>
-      </section>
+        <p className="text-sm text-muted">
+          {latest ? `Last weighed ${dayLabel(latest.date)}` : 'No weigh-ins yet'}
+        </p>
 
-      {trend.length > 1 && (
-        <ChartCard
-          title="Bodyweight trend"
-          subtitle="7-day average of your weigh-ins"
-          raw={{
-            columns: ['Day', 'Weight (kg)', '7-day average (kg)'],
-            rows: trend.toReversed().map((w) => [w.date, w.kg, w.avg]),
-          }}
+        <div className="mt-3">
+          {trend.length > 1 ? (
+            <LineChart
+              label="Bodyweight"
+              points={trend.map((w) => ({ date: w.date, value: w.avg }))}
+              format={(v) => `${Math.round(v * 10) / 10} kg`}
+            />
+          ) : (
+            <p className="rounded-2xl bg-surface-2 p-4 text-center text-sm text-muted">
+              Your trend shows here after a couple of weigh-ins.
+            </p>
+          )}
+        </div>
+
+        <Button
+          variant="secondary"
+          className="mt-3 w-full"
+          onClick={() => setOpen({ kind: 'weight' })}
         >
-          <LineChart
-            label="Bodyweight"
-            points={trend.map((w) => ({ date: w.date, value: w.avg }))}
-            format={(v) => `${Math.round(v * 10) / 10} kg`}
-          />
-        </ChartCard>
-      )}
+          Log weight
+        </Button>
+      </section>
 
       {open?.kind === 'food' && (
         <FoodSheet
