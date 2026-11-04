@@ -1,4 +1,5 @@
 /** Preset workouts by type (Push, Pull…), versions A, B… Names must match the catalogue. */
+import type { PlannedCardio } from '../cardio'
 
 export interface TemplateExercise {
   name: string
@@ -19,6 +20,8 @@ export interface TemplateSession {
   emoji: string
   description: string
   exercises: TemplateExercise[]
+  /** Cardio in the workout, e.g. the Cardio presets */
+  cardio?: PlannedCardio[]
 }
 
 export interface PlanTemplate {
@@ -324,6 +327,39 @@ export const TEMPLATES: readonly PlanTemplate[] = [
           I('Dumbbell Curl', 2, 10, 12),
           I('Straight-Bar Pushdown', 2, 10, 15),
         ],
+      },
+    ],
+  },
+  {
+    id: 'cardio',
+    name: 'Cardio',
+    description: 'Runs, gym machines or intervals. Log the details on the day.',
+    scheduleMode: 'weekday',
+    sessions: [
+      {
+        name: 'A',
+        emoji: '🏃',
+        description: 'A steady 30 minute run at a pace you could talk at.',
+        exercises: [],
+        cardio: [{ activity: 'run', minutes: 30 }],
+      },
+      {
+        name: 'B',
+        emoji: '🚣',
+        description: 'Ten minutes each on the rower, bike and stair climber.',
+        exercises: [],
+        cardio: [
+          { activity: 'row', minutes: 10 },
+          { activity: 'exercise_bike', minutes: 10 },
+          { activity: 'stairs', minutes: 10 },
+        ],
+      },
+      {
+        name: 'C',
+        emoji: '⚡',
+        description: 'Short and hard: 20 minutes of intervals.',
+        exercises: [],
+        cardio: [{ activity: 'hiit', minutes: 20 }],
       },
     ],
   },

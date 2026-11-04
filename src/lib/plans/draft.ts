@@ -61,7 +61,7 @@ export const customExercisesOf = (s: WorkoutSource): readonly CustomExercise[] =
 
 /** Cardio to copy into the plan workout (stored as cardio_json). */
 export const cardioOf = (s: WorkoutSource): PlannedCardio[] =>
-  s.kind === 'custom' ? (s.cardio ?? []) : []
+  s.kind === 'custom' ? (s.cardio ?? []) : (presetFor(s)?.cardio ?? [])
 
 /** Swaps in a new version of a workout's source (e.g. exercises changed), keeping its days. */
 export function replaceDraftSource(

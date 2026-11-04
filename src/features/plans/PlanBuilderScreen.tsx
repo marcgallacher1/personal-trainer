@@ -17,6 +17,7 @@ import {
   type WorkoutSource,
 } from '../../lib/plans/draft'
 import { TEMPLATES, versionTitle, type PlanTemplate } from '../../lib/plans/templates'
+import { cardioEmoji, cardioName } from '../../lib/cardio'
 import { CustomWorkoutCard, type CustomCard } from './CustomWorkoutCard'
 import { DayButtons } from './DayButtons'
 import {
@@ -321,6 +322,14 @@ export function PlanBuilderScreen() {
                       <span className="shrink-0 text-muted">
                         {e.sets} × {e.min}–{e.max}
                       </span>
+                    </li>
+                  ))}
+                  {(s.cardio ?? []).map((c) => (
+                    <li key={c.activity} className="flex justify-between gap-3">
+                      <span className="truncate">
+                        {cardioEmoji(c.activity)} {cardioName(c.activity)}
+                      </span>
+                      <span className="shrink-0 text-muted">{c.minutes} min</span>
                     </li>
                   ))}
                 </ul>

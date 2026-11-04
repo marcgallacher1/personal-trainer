@@ -158,6 +158,18 @@ describe('custom workouts with chosen exercises', () => {
     expect(rows.sessions[0]!.cardio_json).toEqual([])
   })
 
+  it('the Cardio presets bring their cardio into the plan', () => {
+    const rows = buildPlanFromDraft(
+      'Mine',
+      toggleDraftDay([], { kind: 'preset', templateId: 'cardio', version: 'B' }, 3).draft,
+      names,
+      ctx(),
+    )
+    expect(rows.sessions[0]!.name).toBe('Cardio B')
+    expect(rows.sessions[0]!.cardio_json).toHaveLength(3)
+    expect(rows.exercises).toEqual([])
+  })
+
   it('copies cardio too, and a cardio-only workout is fine', () => {
     const runDay: WorkoutSource = {
       kind: 'custom',
