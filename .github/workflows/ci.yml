@@ -45,6 +45,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: CLI v3 rejects this config.toml ([inbucket] was renamed)
+          version: 2.90.0
       - run: supabase db start
       - run: supabase test db
