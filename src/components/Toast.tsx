@@ -108,12 +108,13 @@ function FloatingToast({ toast }: { toast: ToastData }) {
         celebrate ? 'animate-[pop_400ms_ease-out] bg-accent text-accent-fg' : 'bg-text text-bg'
       }`}
     >
-      {celebrate && <span className="text-2xl">🏆</span>}
+      {celebrate && <span className="text-2xl leading-none">🏆</span>}
       <p className="flex-1 font-medium">{toast.message}</p>
       {toast.action && (
         <button
           type="button"
-          className="h-10 shrink-0 rounded-lg px-3 font-semibold underline"
+          // Negative margin: full-size tap target without making the toast taller
+          className="-my-2 h-10 shrink-0 rounded-lg px-3 font-semibold underline"
           onClick={() => {
             toast.action?.onClick()
             dismiss()
