@@ -13,6 +13,7 @@ import {
   cardioDetails,
   cleanDetails,
   detailFields,
+  detailsSummary,
   swimKm,
   type CardioActivity,
   type CardioDetails,
@@ -391,81 +392,91 @@ export function DetailsEditor({
     intervals: 'intervals',
   }
 
+  const extrasLabel = extras.map((f) => extraNames[f]).join(', ')
+  // What's set but hidden, so nothing is saved out of sight
+  const hiddenSummary = detailsSummary(
+    cleanDetails(activity, { ...value, poolLengthM: undefined, lengths: undefined }),
+  )
+
   return (
     <>
       {pool}
-      {extras.length > 0 &&
-        (open ? (
-          <>
-            {has('speed') && (
-              <Field label="Speed (km/h)" hint="Optional. From the treadmill or your watch.">
-                <Stepper
-                  label="speed"
-                  value={n(value.speedKmh)}
-                  step={0.5}
-                  decimals
-                  emptyLabel="–"
-                  onChange={(v) => set({ speedKmh: v })}
-                />
-              </Field>
-            )}
-            {has('incline') && (
-              <Field label="Incline (%)" hint="Optional.">
-                <Stepper
-                  label="incline"
-                  value={n(value.inclinePct)}
-                  step={0.5}
-                  decimals
-                  emptyLabel="–"
-                  onChange={(v) => set({ inclinePct: v })}
-                />
-              </Field>
-            )}
-            {has('level') && (
-              <Field label="Level / resistance" hint="Optional. The number on the machine.">
-                <Stepper
-                  label="level"
-                  value={n(value.level)}
+      {extras.length > 0 && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="-mt-2 h-10 self-start text-left text-sm font-semibold text-accent"
+        >
+          {open ? '−' : '+'} {open ? 'Hide' : 'Add'} {extrasLabel}
+          {!open && hiddenSummary && (
+            <span className="font-normal text-muted"> · {hiddenSummary}</span>
+          )}
+        </button>
+      )}
+      {extras.length > 0 && open && (
+        <>
+          {has('speed') && (
+            <Field label="Speed (km/h)" hint="Optional. From the treadmill or your watch.">
+              <Stepper
+                label="speed"
+                value={n(value.speedKmh)}
+                step={0.5}
+                decimals
+                emptyLabel="–"
+                onChange={(v) => set({ speedKmh: v })}
+              />
+            </Field>
+          )}
+          {has('incline') && (
+            <Field label="Incline (%)" hint="Optional.">
+              <Stepper
+                label="incline"
+                value={n(value.inclinePct)}
+                step={0.5}
+                decimals
+                emptyLabel="–"
+                onChange={(v) => set({ inclinePct: v })}
+              />
+            </Field>
+          )}
+          {has('level') && (
+            <Field label="Level / resistance" hint="Optional. The number on the machine.">
+              <Stepper
+                label="level"
+                value={n(value.level)}
+                step={1}
+                emptyLabel="–"
+                onChange={(v) => set({ level: v })}
+              />
+            </Field>
+          )}
+          {has('intervals') && (
+            <Field label="Intervals" hint="Optional. E.g. 6 rounds of 1 min hard, 90 s easy.">
+              <div className="grid grid-cols-3 gap-2">
+                <IntervalBox
+                  label="Rounds"
+                  value={n(value.rounds)}
                   step={1}
-                  emptyLabel="–"
-                  onChange={(v) => set({ level: v })}
+                  onChange={(v) => set({ rounds: v })}
                 />
-              </Field>
-            )}
-            {has('intervals') && (
-              <Field label="Intervals" hint="Optional. E.g. 6 rounds of 1 min hard, 90 s easy.">
-                <div className="grid grid-cols-3 gap-2">
-                  <IntervalBox
-                    label="Rounds"
-                    value={n(value.rounds)}
-                    step={1}
-                    onChange={(v) => set({ rounds: v })}
-                  />
-                  <IntervalBox
-                    label="Hard (sec)"
-                    value={n(value.workSeconds)}
-                    step={15}
-                    onChange={(v) => set({ workSeconds: v })}
-                  />
-                  <IntervalBox
-                    label="Easy (sec)"
-                    value={n(value.restSeconds)}
-                    step={15}
-                    onChange={(v) => set({ restSeconds: v })}
-                  />
-                </div>
-              </Field>
-            )}
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="-mt-2 h-10 self-start text-sm font-semibold text-accent"
-          >
-            + Add {extras.map((f) => extraNames[f]).join(', ')}
-          </button>
-        ))}
+                <IntervalBox
+                  label="Hard (sec)"
+                  value={n(value.workSeconds)}
+                  step={15}
+                  onChange={(v) => set({ workSeconds: v })}
+                />
+                <IntervalBox
+                  label="Easy (sec)"
+                  value={n(value.restSeconds)}
+                  step={15}
+                  onChange={(v) => set({ restSeconds: v })}
+                />
+              </div>
+            </Field>
+          )}
+        </>
+      )}
     </>
   )
 }

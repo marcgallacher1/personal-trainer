@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../../components/Button'
-import { Sheet } from '../../components/Sheet'
+import { BackButton } from '../../components/BackButton'
 import { useExercises, useSessionSummaries } from '../../db/queries'
 import { DAY_NAMES } from '../../lib/plans/draft'
 import type { PlanSessionRow } from '../../lib/plans/instantiate'
@@ -16,18 +16,14 @@ import { startFromPlan, usePlanLibrary } from './data'
 
 const SHORT_DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-/**
- * "Start workout" (live, timed) or, with `past`, "Log workout" (asks when it was).
- * Offers the active plan's workouts: today's first, then what's left this week, then what's done.
- */
-export function LogWorkoutButton({ past = false }: { past?: boolean }) {
+/** What to offer when starting (or, with `past`, logging) a workout, and how to start each. */
+function useStartChoices(past: boolean) {
   const navigate = useNavigate()
   const library = usePlanLibrary()
   const summaries = useSessionSummaries()
   const exercises = useExercises()
   const training = useTrainingData()
   const extras = todayExtras(usePlanChanges())
-  const [open, setOpen] = useState(false)
   const [now] = useState(() => new Date())
   const todayDate = londonDate(now.toISOString())
   const today = isoWeekday(todayDate)
@@ -101,8 +97,8 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
 
   async function go(start: () => Promise<string>) {
     const id = await start()
-    setOpen(false)
-    void navigate(`/log/session/${id}`)
+    // Replace the picker, so Back from the workout returns to where you started
+    void navigate(`/log/session/${id}`, { replace: true })
   }
 
   /** Starts a plan workout, adding any lifts folded in from a missed one. */
@@ -139,115 +135,170 @@ export function LogWorkoutButton({ past = false }: { past?: boolean }) {
     const days = daysOf(s)
     return days.length ? days.map((d) => DAY_NAMES[d - 1]).join(', ') : 'Any day'
   }
-  const label = past ? 'Log workout' : 'Start workout'
+  return {
+    active,
+    plan,
+    todays,
+    left,
+    done,
+    today,
+    todayDate,
+    trainedToday,
+    when,
+    setWhen,
+    times,
+    go,
+    startPlanned,
+    todayDetail,
+    daysText,
+    doneText,
+  }
+}
 
+/**
+ * "Start workout" (live, timed) or, with `past`, "Log workout" (asks when it was).
+ * Opens a full screen to choose the workout; with no plan, Start goes straight in.
+ */
+export function LogWorkoutButton({ past = false }: { past?: boolean }) {
+  const navigate = useNavigate()
+  const c = useStartChoices(past)
   return (
     <>
       <Button
         className="h-16 text-xl"
-        onClick={() => (active || past ? setOpen(true) : void go(() => startSession()))}
+        onClick={() =>
+          c.active || past
+            ? void navigate(past ? '/log/new' : '/start')
+            : void c.go(() => startSession())
+        }
       >
-        {label}
+        {past ? 'Log workout' : 'Start workout'}
       </Button>
-      {todays.length > 0 && (
+      {c.todays.length > 0 && (
         <p className="-mt-1 text-center text-sm text-muted">
-          {trainedToday ? 'Next up' : 'Suggested today'}:{' '}
-          <b className="text-text">{todays.map((s) => s.name).join(' + ')}</b>
+          {c.trainedToday ? 'Next up' : 'Suggested today'}:{' '}
+          <b className="text-text">{c.todays.map((s) => s.name).join(' + ')}</b>
         </p>
       )}
-
-      <Sheet
-        open={open}
-        title={label}
-        subtitle={past ? 'Pick when you trained' : active?.plan.name}
-        closeLabel="Cancel"
-        onClose={() => setOpen(false)}
-      >
-        <div className="flex flex-col gap-5">
-          {past && (
-            <section className="flex flex-col gap-2">
-              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">When</h3>
-              <Row label="Day">
-                <input
-                  type="date"
-                  value={when.date}
-                  max={todayDate}
-                  onChange={(e) => e.target.value && setWhen({ ...when, date: e.target.value })}
-                  className={INPUT}
-                />
-              </Row>
-              <Row label="Started">
-                <input
-                  type="time"
-                  value={when.time}
-                  onChange={(e) => e.target.value && setWhen({ ...when, time: e.target.value })}
-                  className={INPUT}
-                />
-              </Row>
-              <Row label="Minutes">
-                <input
-                  inputMode="numeric"
-                  value={when.minutes || ''}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) =>
-                    setWhen({ ...when, minutes: Math.min(600, Number(e.target.value) || 0) })
-                  }
-                  className={INPUT}
-                />
-              </Row>
-            </section>
-          )}
-
-          <Group
-            title={trainedToday ? 'Next up' : `Suggested today · ${DAY_NAMES[today - 1]}`}
-            items={todays}
-          >
-            {(s) => (
-              <WorkoutRow
-                key={s.id}
-                session={s}
-                highlight
-                detail={todayDetail(s)}
-                onStart={() => startPlanned(s)}
-              />
-            )}
-          </Group>
-
-          <Group title={past ? 'From your plan' : 'Left this week'} items={past ? plan : left}>
-            {(s) => (
-              <WorkoutRow
-                key={s.id}
-                session={s}
-                detail={(past ? doneText(s) : null) ?? daysText(s)}
-                onStart={() => startPlanned(s)}
-              />
-            )}
-          </Group>
-
-          {!past && (
-            <Group title="Done this week" items={done}>
-              {(s) => (
-                <WorkoutRow
-                  key={s.id}
-                  session={s}
-                  muted
-                  detail={doneText(s) ?? undefined}
-                  onStart={() => startPlanned(s)}
-                />
-              )}
-            </Group>
-          )}
-
-          <button
-            type="button"
-            onClick={() => void go(() => startSession(times()))}
-            className="h-14 rounded-2xl border border-dashed border-border font-semibold"
-          >
-            Custom workout
-          </button>
-        </div>
-      </Sheet>
     </>
+  )
+}
+
+/** Full screen: today's suggestion first, then what's left this week, then what's done. */
+export function StartWorkoutScreen({ past = false }: { past?: boolean }) {
+  const {
+    active,
+    plan,
+    todays,
+    left,
+    done,
+    today,
+    todayDate,
+    trainedToday,
+    when,
+    setWhen,
+    times,
+    go,
+    startPlanned,
+    todayDetail,
+    daysText,
+    doneText,
+  } = useStartChoices(past)
+  return (
+    <div className="flex flex-col gap-4">
+      <BackButton fallback={past ? '/log' : '/'} label={past ? 'Log' : 'Today'} />
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {past ? 'Log workout' : 'Start workout'}
+        </h1>
+        {(past || active) && (
+          <p className="text-muted">{past ? 'Pick when you trained' : active?.plan.name}</p>
+        )}
+      </div>
+      <div className="flex flex-col gap-5">
+        {past && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">When</h3>
+            <Row label="Day">
+              <input
+                type="date"
+                value={when.date}
+                max={todayDate}
+                onChange={(e) => e.target.value && setWhen({ ...when, date: e.target.value })}
+                className={INPUT}
+              />
+            </Row>
+            <Row label="Started">
+              <input
+                type="time"
+                value={when.time}
+                onChange={(e) => e.target.value && setWhen({ ...when, time: e.target.value })}
+                className={INPUT}
+              />
+            </Row>
+            <Row label="Minutes">
+              <input
+                inputMode="numeric"
+                value={when.minutes || ''}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) =>
+                  setWhen({ ...when, minutes: Math.min(600, Number(e.target.value) || 0) })
+                }
+                className={INPUT}
+              />
+            </Row>
+          </section>
+        )}
+
+        <Group
+          title={trainedToday ? 'Next up' : `Suggested today · ${DAY_NAMES[today - 1]}`}
+          items={todays}
+        >
+          {(s) => (
+            <WorkoutRow
+              key={s.id}
+              session={s}
+              highlight
+              detail={todayDetail(s)}
+              onStart={() => startPlanned(s)}
+            />
+          )}
+        </Group>
+
+        <Group title={past ? 'From your plan' : 'Left this week'} items={past ? plan : left}>
+          {(s) => (
+            <WorkoutRow
+              key={s.id}
+              session={s}
+              detail={(past ? doneText(s) : null) ?? daysText(s)}
+              onStart={() => startPlanned(s)}
+            />
+          )}
+        </Group>
+
+        {!past && (
+          <Group title="Done this week" items={done}>
+            {(s) => (
+              <WorkoutRow
+                key={s.id}
+                session={s}
+                muted
+                detail={doneText(s) ?? undefined}
+                onStart={() => startPlanned(s)}
+              />
+            )}
+          </Group>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void go(() => startSession(times()))}
+          className="h-14 rounded-2xl border border-dashed border-border font-semibold"
+        >
+          Custom workout
+        </button>
+      </div>
+    </div>
   )
 }
 

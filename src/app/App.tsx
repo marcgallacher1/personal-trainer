@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { StartWorkoutScreen } from '../features/plans/LogWorkoutButton'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { supabaseConfigured } from '../db/supabase'
 import { claimLocalData } from '../db/sync'
@@ -41,6 +42,8 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <TodayScreen /> },
       { path: '/log', element: <LogScreen /> },
+      { path: '/start', element: <StartWorkoutScreen /> },
+      { path: '/log/new', element: <StartWorkoutScreen past /> },
       { path: '/log/session/:id', element: <SessionScreen /> },
       { path: '/exercises', element: <LibraryScreen /> },
       { path: '/exercises/new', element: <ExerciseFormScreen /> },
