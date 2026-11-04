@@ -24,6 +24,7 @@ export function CustomWorkoutCard({
   card,
   placeholder,
   nameLocked,
+  cardioFirst = false,
   days,
   onChange,
   onToggleDay,
@@ -32,6 +33,8 @@ export function CustomWorkoutCard({
   placeholder: string
   /** Already in a saved plan: rename it from the plan instead */
   nameLocked: boolean
+  /** Cardio section: cardio is the main choice, weights the extra */
+  cardioFirst?: boolean
   days: number[]
   onChange: (
     next: CustomCard,
@@ -69,77 +72,151 @@ export function CustomWorkoutCard({
             className="w-full bg-transparent text-xl font-bold outline-none placeholder:text-muted disabled:opacity-100"
           />
           <p className="text-sm text-muted">
-            {nameLocked ? 'In your plan — rename it from the plan.' : 'Your own exercises.'}
+            {nameLocked
+              ? 'In your plan — rename it from the plan.'
+              : cardioFirst
+                ? 'Your own cardio.'
+                : 'Your own exercises.'}
           </p>
         </div>
       </div>
 
-      {card.exercises.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-0.5 text-sm">
-          {card.exercises.map((ce) => {
-            const ex = byId.get(ce.exerciseId)
-            return (
-              <li key={ce.exerciseId} className="flex items-center justify-between gap-3">
-                <span className="min-w-0 flex-1 truncate">{ex?.name ?? 'Exercise'}</span>
-                <span className="shrink-0 text-muted">
-                  {describeTargets(ce.targets, asLogType(ex?.log_type))}
-                </span>
-                {ex && (
+      {cardioFirst ? (
+        <>
+          {card.cardio.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-0.5 text-sm">
+              {card.cardio.map((c, i) => (
+                <li key={i}>
                   <button
                     type="button"
-                    aria-label={`Remove ${ex.name}`}
-                    onClick={() => pick(ex)}
-                    className="-mr-2 h-8 w-8 shrink-0 text-lg text-muted"
+                    onClick={() => setCardioOpen(i)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
                   >
-                    ×
+                    <span className="min-w-0 flex-1 truncate">
+                      {cardioEmoji(c.activity)} {cardioName(c.activity)}
+                    </span>
+                    <span className="shrink-0 text-muted">{c.minutes} min</span>
                   </button>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() => setCardioOpen('new')}
+            className="mt-3 h-11 w-full rounded-xl bg-surface-2 font-semibold text-accent"
+          >
+            + {card.cardio.length ? 'Add more cardio' : 'Choose cardio'}
+          </button>
+          {card.exercises.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-0.5 text-sm">
+              {card.exercises.map((ce) => {
+                const ex = byId.get(ce.exerciseId)
+                return (
+                  <li key={ce.exerciseId} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 flex-1 truncate">{ex?.name ?? 'Exercise'}</span>
+                    <span className="shrink-0 text-muted">
+                      {describeTargets(ce.targets, asLogType(ex?.log_type))}
+                    </span>
+                    {ex && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${ex.name}`}
+                        onClick={() => pick(ex)}
+                        className="-mr-2 h-8 w-8 shrink-0 text-lg text-muted"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
 
-      <button
-        type="button"
-        onClick={() => setPicking(true)}
-        className="mt-3 h-11 w-full rounded-xl bg-surface-2 font-semibold text-accent"
-      >
-        + {card.exercises.length ? 'Add more exercises' : 'Choose exercises'}
-      </button>
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="mt-1 h-10 w-full text-sm font-semibold text-muted"
+          >
+            + Add weights
+          </button>
+        </>
+      ) : (
+        <>
+          {card.exercises.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-0.5 text-sm">
+              {card.exercises.map((ce) => {
+                const ex = byId.get(ce.exerciseId)
+                return (
+                  <li key={ce.exerciseId} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 flex-1 truncate">{ex?.name ?? 'Exercise'}</span>
+                    <span className="shrink-0 text-muted">
+                      {describeTargets(ce.targets, asLogType(ex?.log_type))}
+                    </span>
+                    {ex && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${ex.name}`}
+                        onClick={() => pick(ex)}
+                        className="-mr-2 h-8 w-8 shrink-0 text-lg text-muted"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
 
-      {card.cardio.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-0.5 text-sm">
-          {card.cardio.map((c, i) => (
-            <li key={i}>
-              <button
-                type="button"
-                onClick={() => setCardioOpen(i)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  {cardioEmoji(c.activity)} {cardioName(c.activity)}
-                </span>
-                <span className="shrink-0 text-muted">{c.minutes} min</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="mt-3 h-11 w-full rounded-xl bg-surface-2 font-semibold text-accent"
+          >
+            + {card.exercises.length ? 'Add more exercises' : 'Choose exercises'}
+          </button>
+          {card.cardio.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-0.5 text-sm">
+              {card.cardio.map((c, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => setCardioOpen(i)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {cardioEmoji(c.activity)} {cardioName(c.activity)}
+                    </span>
+                    <span className="shrink-0 text-muted">{c.minutes} min</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() => setCardioOpen('new')}
+            className="mt-1 h-10 w-full text-sm font-semibold text-muted"
+          >
+            + Add cardio
+          </button>
+        </>
       )}
-      <button
-        type="button"
-        onClick={() => setCardioOpen('new')}
-        className="mt-1 h-10 w-full text-sm font-semibold text-muted"
-      >
-        + Add cardio
-      </button>
 
       {ready ? (
         <DayButtons selected={days} onToggle={onToggleDay} />
       ) : (
         <p className="mt-3 text-center text-xs text-muted">
-          {card.name.trim() ? 'Choose some exercises' : 'Name it and choose some exercises'} (or add
-          cardio), then pick the day(s).
+          {cardioFirst
+            ? card.name.trim()
+              ? 'Choose some cardio'
+              : 'Name it and choose some cardio'
+            : card.name.trim()
+              ? 'Choose some exercises (or add cardio)'
+              : 'Name it and choose some exercises (or add cardio)'}
+          , then pick the day(s).
         </p>
       )}
 

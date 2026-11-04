@@ -363,6 +363,7 @@ export function PlanBuilderScreen() {
                     category === 'custom' ? 'Name, e.g. Arms' : `Custom ${category.name}`
                   }
                   nameLocked={Boolean(planId && savedSessionFor(c))}
+                  cardioFirst={c.group === 'cardio'}
                   days={c.name.trim() ? daysFor(source) : []}
                   onChange={(next, picked) => void changeCard(next, picked)}
                   onToggleDay={(d) => void toggle(source, d)}
