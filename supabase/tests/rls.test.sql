@@ -66,8 +66,9 @@ select throws_ok(
   '42501', null, 'clients cannot write notification_log');
 
 -- Server-only functions can't be called from the app
-select throws_ok($$ select public.configure_notify('x', 'y') $$, '42501', null, 'clients cannot configure the cron secret');
-select throws_ok($$ select public.run_notify() $$, '42501', null, 'clients cannot trigger notify');
+-- Checked as a privilege, not by calling them: on GitHub's runners calling them crashed the test server
+select ok(not has_function_privilege('authenticated', 'public.configure_notify(text, text)', 'execute'), 'clients cannot configure the cron secret');
+select ok(not has_function_privilege('authenticated', 'public.run_notify()', 'execute'), 'clients cannot trigger notify');
 
 select throws_ok($$ select * from public.invites $$, '42501', null, 'clients cannot read the invite list');
 

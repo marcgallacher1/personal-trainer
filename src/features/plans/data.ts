@@ -7,6 +7,7 @@ import { deletion, newId, nowIso, save, saveOne, type Change } from '../../db/wr
 import { isTimed, type LogType } from '../../lib/logging/types'
 import {
   buildPlanFromDraft,
+  cardioOf,
   customExercisesOf,
   emojiFor,
   presetFor,
@@ -244,7 +245,7 @@ export async function togglePlanDay(
     emojiFor(source),
   )
   await save([
-    { table: 'plan_sessions', row: w.session },
+    { table: 'plan_sessions', row: { ...w.session, cardio_json: cardioOf(source) as never } },
     ...w.exercises.map((row) => ({ table: 'plan_exercises' as const, row })),
     ...w.targets.map((row) => ({ table: 'plan_set_targets' as const, row })),
     { table: 'plan_schedule', row: newScheduleRow(c, planId, w.session.id, weekday) },

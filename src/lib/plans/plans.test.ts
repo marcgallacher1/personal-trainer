@@ -155,6 +155,18 @@ describe('custom workouts with chosen exercises', () => {
     ])
     expect(rows.targets).toHaveLength(5)
     expect(rows.schedule.map((d) => d.weekday)).toEqual([3])
+    expect(rows.sessions[0]!.cardio_json).toEqual([])
+  })
+
+  it('copies cardio too, and a cardio-only workout is fine', () => {
+    const runDay: WorkoutSource = {
+      kind: 'custom',
+      name: 'Run day',
+      cardio: [{ activity: 'run', minutes: 30 }],
+    }
+    const rows = buildPlanFromDraft('Mine', toggleDraftDay([], runDay, 6).draft, names, ctx())
+    expect(rows.sessions[0]!.cardio_json).toEqual([{ activity: 'run', minutes: 30 }])
+    expect(rows.exercises).toEqual([])
   })
 
   it('updates a workout already on a day when its exercises or name change', () => {

@@ -7,6 +7,7 @@ import {
 } from './instantiate'
 import type { TargetLike } from './targets'
 import { TEMPLATES, versionTitle, type TemplateSession } from './templates'
+import type { PlannedCardio } from '../cardio'
 
 export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
@@ -19,7 +20,13 @@ export interface CustomExercise {
 /** Where a plan workout came from: a preset, or your own with picked exercises. */
 export type WorkoutSource =
   | { kind: 'preset'; templateId: string; version: string }
-  | { kind: 'custom'; name: string; templateId?: string; exercises?: CustomExercise[] }
+  | {
+      kind: 'custom'
+      name: string
+      templateId?: string
+      exercises?: CustomExercise[]
+      cardio?: PlannedCardio[]
+    }
 
 export interface DraftItem {
   /** Stable identity of the source, e.g. "preset:push:A" or "custom:arms" */
@@ -51,6 +58,10 @@ export function emojiFor(s: WorkoutSource): string | null {
 /** Custom exercises to copy into the plan (presets bring their own). */
 export const customExercisesOf = (s: WorkoutSource): readonly CustomExercise[] =>
   s.kind === 'custom' ? (s.exercises ?? []) : []
+
+/** Cardio to copy into the plan workout (stored as cardio_json). */
+export const cardioOf = (s: WorkoutSource): PlannedCardio[] =>
+  s.kind === 'custom' ? (s.cardio ?? []) : []
 
 /** Swaps in a new version of a workout's source (e.g. exercises changed), keeping its days. */
 export function replaceDraftSource(
@@ -152,7 +163,7 @@ export function buildPlanFromDraft(
       customExercisesOf(item.source),
       item.emoji,
     )
-    rows.sessions.push(w.session)
+    rows.sessions.push({ ...w.session, cardio_json: cardioOf(item.source) as never })
     rows.exercises.push(...w.exercises)
     rows.targets.push(...w.targets)
     rows.missing.push(...w.missing)

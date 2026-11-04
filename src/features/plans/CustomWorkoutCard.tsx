@@ -3,6 +3,8 @@ import { Sheet } from '../../components/Sheet'
 import { useExercises, type Exercise } from '../../db/queries'
 import { asLogType } from '../../lib/logging/logTypes'
 import type { CustomExercise } from '../../lib/plans/draft'
+import { cardioEmoji, cardioName, type PlannedCardio } from '../../lib/cardio'
+import { CardioPlanSheet } from './PlanCardioSheet'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
 import { DayButtons } from './DayButtons'
@@ -14,6 +16,7 @@ export interface CustomCard {
   group: string
   name: string
   exercises: CustomExercise[]
+  cardio: PlannedCardio[]
 }
 
 /** Your own workout in the plan builder: name, exercises, then day(s). */
@@ -30,13 +33,19 @@ export function CustomWorkoutCard({
   /** Already in a saved plan: rename it from the plan instead */
   nameLocked: boolean
   days: number[]
-  onChange: (next: CustomCard, picked?: { exercise: Exercise; added: boolean }) => void
+  onChange: (
+    next: CustomCard,
+    picked?: { exercise: Exercise; added: boolean } | { cardio: true },
+  ) => void
   onToggleDay: (weekday: number) => void
 }) {
   const library = useExercises()
   const [picking, setPicking] = useState(false)
+  /** 'new' = adding cardio; a number = editing that item */
+  const [cardioOpen, setCardioOpen] = useState<number | 'new' | null>(null)
   const byId = new Map((library ?? []).map((e) => [e.id, e]))
-  const ready = card.name.trim() !== '' && card.exercises.length > 0
+  const ready = card.name.trim() !== '' && (card.exercises.length > 0 || card.cardio.length > 0)
+  const setCardio = (cardio: PlannedCardio[]) => onChange({ ...card, cardio }, { cardio: true })
 
   function pick(e: Exercise) {
     const has = card.exercises.some((x) => x.exerciseId === e.id)
@@ -99,13 +108,55 @@ export function CustomWorkoutCard({
         + {card.exercises.length ? 'Add more exercises' : 'Choose exercises'}
       </button>
 
+      {card.cardio.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-0.5 text-sm">
+          {card.cardio.map((c, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                onClick={() => setCardioOpen(i)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {cardioEmoji(c.activity)} {cardioName(c.activity)}
+                </span>
+                <span className="shrink-0 text-muted">{c.minutes} min</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={() => setCardioOpen('new')}
+        className="mt-1 h-10 w-full text-sm font-semibold text-muted"
+      >
+        + Add cardio
+      </button>
+
       {ready ? (
         <DayButtons selected={days} onToggle={onToggleDay} />
       ) : (
         <p className="mt-3 text-center text-xs text-muted">
-          {card.name.trim() ? 'Choose some exercises' : 'Name it and choose some exercises'}, then
-          pick the day(s).
+          {card.name.trim() ? 'Choose some exercises' : 'Name it and choose some exercises'} (or add
+          cardio), then pick the day(s).
         </p>
+      )}
+
+      {cardioOpen !== null && (
+        <CardioPlanSheet
+          key={String(cardioOpen)}
+          initial={cardioOpen === 'new' ? undefined : card.cardio[cardioOpen]}
+          onSave={(c) =>
+            setCardio(
+              cardioOpen === 'new'
+                ? [...card.cardio, c]
+                : card.cardio.map((x, i) => (i === cardioOpen ? c : x)),
+            )
+          }
+          onRemove={() => setCardio(card.cardio.filter((_, i) => i !== cardioOpen))}
+          onClose={() => setCardioOpen(null)}
+        />
       )}
 
       <Sheet

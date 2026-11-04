@@ -24,6 +24,7 @@ import {
   removePlanExercise,
   savePlanFromDraft,
   togglePlanDay,
+  updatePlanSession,
   usePlanRows,
   usePlans,
 } from './data'
@@ -45,6 +46,7 @@ const blankCard = (group: string, name: string): CustomCard => ({
   group,
   name,
   exercises: [],
+  cardio: [],
 })
 
 const groupOf = (c: PlanTemplate | 'custom') => (c === 'custom' ? 'own' : c.id)
@@ -56,6 +58,7 @@ const customSource = (c: CustomCard): WorkoutSource => ({
   name: c.name,
   ...(c.group === 'own' ? {} : { templateId: c.group }),
   exercises: c.exercises,
+  ...(c.cardio.length ? { cardio: c.cardio } : {}),
 })
 
 /** Pick a workout, tap its day(s), repeat, save. Also adds to an existing plan. */
@@ -75,6 +78,7 @@ export function PlanBuilderScreen() {
             {
               ...blankCard(d.source.templateId ?? 'own', d.source.name),
               exercises: d.source.exercises ?? [],
+              cardio: d.source.cardio ?? [],
             },
           ]
         : [],
@@ -138,7 +142,10 @@ export function PlanBuilderScreen() {
   const savedSessionFor = (c: CustomCard) =>
     existing?.sessions.find((s) => s.name.toLowerCase() === c.name.trim().toLowerCase())
 
-  async function changeCard(next: CustomCard, picked?: { exercise: Exercise; added: boolean }) {
+  async function changeCard(
+    next: CustomCard,
+    picked?: { exercise: Exercise; added: boolean } | { cardio: true },
+  ) {
     const prev = cards.find((x) => x.id === next.id)
     if (!prev) return
     setCards(cards.map((x) => (x.id === next.id ? next : x)))
@@ -149,6 +156,10 @@ export function PlanBuilderScreen() {
     // Already in the saved plan: keep its exercises in step
     const session = savedSessionFor(prev)
     if (!session || !picked) return
+    if ('cardio' in picked) {
+      await updatePlanSession(session, { cardio_json: next.cardio as never })
+      return
+    }
     if (picked.added) {
       await addPlanExercise(session.id, picked.exercise, asLogType(picked.exercise.log_type))
     } else {
