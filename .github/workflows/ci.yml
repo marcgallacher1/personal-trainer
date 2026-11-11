@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           # Pinned: CLI v3 rejects this config.toml ([inbucket] was renamed)
           version: 2.90.0
