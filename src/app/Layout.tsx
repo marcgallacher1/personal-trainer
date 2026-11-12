@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { Outlet, ScrollRestoration, useNavigate } from 'react-router'
 import { SyncPill } from '../components/SyncPill'
-import { ToastHost } from '../components/Toast'
-import { sweepEmptyWorkouts } from '../features/plans/data'
+import { showToast, ToastHost } from '../components/Toast'
+import { autoSaveStale, sweepEmptyWorkouts } from '../features/plans/data'
 import { TabBar } from './TabBar'
 
 export function Layout() {
@@ -22,6 +22,24 @@ export function Layout() {
   useEffect(() => {
     const t = setTimeout(() => void sweepEmptyWorkouts(), 5000)
     return () => clearTimeout(t)
+  }, [])
+
+  // A live workout with nothing logged for 30 minutes saves itself. Checked every minute and
+  // whenever you come back to the app
+  useEffect(() => {
+    const check = () =>
+      void autoSaveStale().then((n) => {
+        if (n > 0) showToast({ message: 'Workout saved automatically' })
+      })
+    const onVisible = () => document.visibilityState === 'visible' && check()
+    const t = setInterval(check, 60_000)
+    const first = setTimeout(check, 6000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(t)
+      clearTimeout(first)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   return (

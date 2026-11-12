@@ -2,12 +2,12 @@
  * Coaching suggestions. Nothing here changes the plan: each suggestion offers choices you accept
  * or turn down, and the app applies only what you accept.
  */
-import { swapCredit, weeklyAdherence, type PlannedWorkout } from '../analysis/adherence'
+import { swapCredit } from '../analysis/adherence'
 import { actualMuscles, type MuscleContext } from '../analysis/muscles'
 import { exerciseTrend, strengthSeries } from '../analysis/strength'
 import { addDays, weekdayOf, weekOf, type TrainingSession } from '../analysis/training'
 import type { Fix, Rating, RatingWorkout } from '../rating/rate'
-import { suggestWorkout } from '../plans/suggest'
+import { suggestWorkout, weekDone } from '../plans/suggest'
 import { INCREMENT } from './progression'
 
 export type ProposalAction =
@@ -73,38 +73,29 @@ function missed({ today, sessions, ctx, plan }: ProposalInput): Proposal[] {
   const from = plan.since > monday ? plan.since : monday
   if (todayN === 1 || from >= today) return []
 
-  const planned: PlannedWorkout[] = plan.workouts.map((w) => ({
-    id: w.id,
-    name: w.name,
-    perWeek: w.days.length || 1,
-    exercises: w.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: working(e).length })),
-  }))
-  // Done this week so far (today included), so a workout done on another day still counts
-  const week = weeklyAdherence(planned, sessions, ctx.exercises, from, today)[0]
-  const doneCount = new Map<string, number>()
-  for (const s of week?.sessions ?? []) {
-    if (s.workoutId) doneCount.set(s.workoutId, (doneCount.get(s.workoutId) ?? 0) + 1)
+  const asSuggest = {
+    today,
+    workouts: plan.workouts.map((x) => ({
+      id: x.id,
+      name: x.name,
+      days: x.days,
+      exerciseIds: x.exercises.map((e) => e.exerciseId),
+    })),
+    sessions: sessions
+      .filter((s) => s.date >= from)
+      .map((s) => ({ date: s.date, workoutId: s.planSessionId, sets: s.sets })),
+    info: ctx.exercises,
   }
+  // Done this week so far: the same count Start workout uses, so the two never disagree.
+  // A workout on another day, or a custom one that trained the same muscles, still counts.
+  const doneCount = weekDone(asSuggest)
   const left = (w: RatingWorkout) => Math.max(1, w.days.length) - (doneCount.get(w.id) ?? 0)
   const dateOf = (day: number) => addDays(monday, day - 1)
   const trainedToday = sessions.some((s) => s.date === today)
   // A day is taken only by a workout that still needs doing this week
   const busy = (d: number) => plan.workouts.some((x) => x.days.includes(d) && left(x) > 0)
   // What Start workout suggests today; no point also nagging about it here
-  const suggested = trainedToday
-    ? null
-    : suggestWorkout({
-        today,
-        workouts: plan.workouts.map((x) => ({
-          id: x.id,
-          name: x.name,
-          days: x.days,
-          exerciseIds: x.exercises.map((e) => e.exerciseId),
-        })),
-        sessions: sessions.map((s) => ({ date: s.date, workoutId: s.planSessionId, sets: s.sets })),
-        info: ctx.exercises,
-        muscleName: (id) => id,
-      })?.workoutId
+  const suggested = suggestWorkout({ ...asSuggest, muscleName: (id) => id })?.workoutId
 
   const out: Proposal[] = []
   for (const w of plan.workouts) {

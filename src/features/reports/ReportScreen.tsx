@@ -3,7 +3,13 @@ import { Link, Navigate, useParams } from 'react-router'
 import { BackButton } from '../../components/BackButton'
 import { supabase } from '../../db/supabase'
 import { addDays, weekOf } from '../../lib/analysis/training'
-import { mondayOfIsoWeek, type WeeklyReport } from '../../lib/report/weekly'
+import {
+  listNames,
+  mondayOfIsoWeek,
+  type WeekScore,
+  type WeeklyReport,
+} from '../../lib/report/weekly'
+import { scoreColour } from '../review/ReviewBadge'
 import { isoWeek } from '../../lib/time/london'
 import { BodyMap } from '../plans/BodyMap'
 import { MuscleBars } from '../progress/MuscleBars'
@@ -67,6 +73,8 @@ function Report({
         </h1>
         <p className="mt-1">{report.headline}</p>
       </div>
+
+      {report.final && report.score && <WeekScoreCard score={report.score} />}
 
       <div className="grid grid-cols-3 gap-2">
         <Tile
@@ -265,6 +273,51 @@ function AiNote({ week, stored, ready }: { week: string; stored: string | null; 
     <section className="rounded-2xl bg-surface p-4">
       <p className="text-xs font-semibold tracking-wide text-muted uppercase">Coach’s note</p>
       <p className="mt-1 whitespace-pre-line">{text}</p>
+    </section>
+  )
+}
+
+const pctOf = (n: number) => `${Math.round(n * 100)}%`
+
+/** The week out of 100: mostly whether each muscle got its sets, and why it lost points. */
+function WeekScoreCard({ score }: { score: WeekScore }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4">
+      <div className="flex items-center gap-3">
+        <span
+          aria-label={`Week rated ${score.total} out of 100`}
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold tabular-nums ${scoreColour(score.total)}`}
+        >
+          {score.total}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-lg font-bold">Week score</span>
+          <span className="block text-xs text-muted">
+            Mostly the sets each muscle got against your targets; which workouts barely matters.
+          </span>
+        </span>
+      </div>
+      <ul className="flex flex-col gap-1.5 text-sm">
+        <li className="flex justify-between gap-3 rounded-xl bg-surface-2 p-3">
+          <span>Muscle sets vs targets</span>
+          <span className="font-bold tabular-nums">{pctOf(score.muscles)}</span>
+        </li>
+        {score.plan !== null && (
+          <li className="flex justify-between gap-3 rounded-xl bg-surface-2 p-3">
+            <span>
+              Followed the plan <span className="text-muted">(counts for a tenth)</span>
+            </span>
+            <span className="font-bold tabular-nums">{pctOf(score.plan)}</span>
+          </li>
+        )}
+        {score.short.length > 0 && (
+          <li className="rounded-xl bg-surface-2 p-3">
+            <span className="font-bold text-accent">→ </span>
+            Short on{' '}
+            {listNames(score.short.map((m) => `${m.name.toLowerCase()} (${m.sets} of ${m.min})`))}.
+          </li>
+        )}
+      </ul>
     </section>
   )
 }

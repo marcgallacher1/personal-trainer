@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ExerciseInfo } from '../analysis/training'
 import { EXERCISES } from '../seed/exercises'
-import { suggestWorkout, type SuggestSession, type SuggestWorkout } from './suggest'
+import { suggestWorkout, weekDone, type SuggestSession, type SuggestWorkout } from './suggest'
 
 const info: Map<string, ExerciseInfo> = new Map(
   EXERCISES.map((e) => [
@@ -90,6 +90,30 @@ describe('suggested workout', () => {
     })
     expect(r?.workoutId).toBe('pull')
     expect(r?.why).toMatch(/^Chest and side_delts worked recently/)
+  })
+
+  it('ticks off a plan workout when a custom one trained its muscles', () => {
+    // Tue: chest, delts and triceps done as a custom workout (other exercises, no plan link)
+    const custom: SuggestSession = {
+      date: '2026-11-03',
+      workoutId: null,
+      sets: ['Incline Dumbbell Press', 'Dumbbell Lateral Raise', 'Straight-Bar Pushdown'].flatMap(
+        (exerciseId) => Array.from({ length: 3 }, () => ({ exerciseId, setType: 'working' })),
+      ),
+    }
+    const done = weekDone({ today: '2026-11-04', workouts: plan, sessions: [custom], info })
+    expect([...done]).toEqual([['push', 1]])
+    // So Wednesday moves on to back and biceps
+    expect(suggest('2026-11-04', [custom])?.workoutId).toBe('pull')
+  })
+
+  it('doesn’t tick off a workout from a few stray sets', () => {
+    const stray: SuggestSession = {
+      date: '2026-11-03',
+      workoutId: null,
+      sets: [{ exerciseId: 'Dumbbell Curl', setType: 'working' }],
+    }
+    expect(weekDone({ today: '2026-11-04', workouts: plan, sessions: [stray], info }).size).toBe(0)
   })
 
   it('returns nothing once the week’s plan is done', () => {

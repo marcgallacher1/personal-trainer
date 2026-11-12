@@ -42,6 +42,61 @@ function musclesOf(ids: readonly string[], info: ReadonlyMap<string, ExerciseInf
   return out
 }
 
+/** A workout counts as a plan workout when it trained at least this share of its main muscles */
+const COVERED = 0.5
+/** Working sets on a muscle for it to count as trained in a workout */
+const TRAINED_SETS = 3
+
+/**
+ * How many times each plan workout has been done this week (Monday to `today`).
+ * A workout started from the plan counts for that plan workout. Any other workout counts for the
+ * plan workout whose main muscles it trained most (at least half of them), so a custom or
+ * mixed-up session still ticks off what it covered. Start workout and the Coach both use this.
+ */
+export function weekDone(input: {
+  today: string
+  workouts: readonly SuggestWorkout[]
+  sessions: readonly SuggestSession[]
+  info: ReadonlyMap<string, ExerciseInfo>
+}): Map<string, number> {
+  const { today, workouts, sessions, info } = input
+  const monday = weekOf(today)
+  const done = new Map<string, number>()
+  const add = (id: string) => done.set(id, (done.get(id) ?? 0) + 1)
+  const ids = new Set(workouts.map((w) => w.id))
+  const week = sessions
+    .filter((s) => s.date >= monday && s.date <= today)
+    .toSorted((a, b) => a.date.localeCompare(b.date))
+
+  for (const s of week) if (s.workoutId && ids.has(s.workoutId)) add(s.workoutId)
+
+  for (const s of week) {
+    if (s.workoutId && ids.has(s.workoutId)) continue
+    // Working sets per main muscle in this workout
+    const trained = new Map<string, number>()
+    for (const x of s.sets) {
+      if (!isWorking(x)) continue
+      for (const m of info.get(x.exerciseId)?.muscles ?? []) {
+        if (m.weight >= 1) trained.set(m.muscleId, (trained.get(m.muscleId) ?? 0) + 1)
+      }
+    }
+    let best: { id: string; share: number } | null = null
+    for (const w of workouts) {
+      if ((done.get(w.id) ?? 0) >= Math.max(1, w.days.length)) continue
+      const muscles = musclesOf(w.exerciseIds, info)
+      const total = [...muscles.values()].reduce((a, b) => a + b, 0)
+      if (!total) continue
+      const hit = [...muscles]
+        .filter(([m]) => (trained.get(m) ?? 0) >= TRAINED_SETS)
+        .reduce((a, [, n]) => a + n, 0)
+      const share = hit / total
+      if (share >= COVERED && (!best || share > best.share)) best = { id: w.id, share }
+    }
+    if (best) add(best.id)
+  }
+  return done
+}
+
 export function suggestWorkout(input: {
   today: string
   workouts: readonly SuggestWorkout[]
@@ -50,7 +105,6 @@ export function suggestWorkout(input: {
   muscleName: (id: string) => string
 }): Suggestion | null {
   const { today, workouts, sessions, info } = input
-  const monday = weekOf(today)
   const day = weekdayOf(today)
 
   // Sets per main muscle over the last 2 days (today included)
@@ -66,11 +120,7 @@ export function suggestWorkout(input: {
   }
   const isTired = (m: string) => (tired.get(m) ?? 0) >= TIRED_SETS
 
-  const done = new Map<string, number>()
-  for (const s of sessions) {
-    if (s.workoutId && s.date >= monday && s.date <= today)
-      done.set(s.workoutId, (done.get(s.workoutId) ?? 0) + 1)
-  }
+  const done = weekDone({ today, workouts, sessions, info })
 
   let best: { w: SuggestWorkout; score: number; why: string[] } | null = null
   for (const w of workouts) {

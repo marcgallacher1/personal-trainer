@@ -93,6 +93,19 @@ describe('workout review', () => {
     for (const b of [...r.good, ...r.improve]) expect(b.length).toBeLessThan(110)
   })
 
+  it('judges against the plan as customised: removed exercises aren’t skipped', () => {
+    const sets = workout('b', '2026-11-03', [['Barbell Bench Press', 3, 62.5, 8]])
+    // Lateral raises were taken off the list before training
+    const removed = { ...sets, listed: ['Barbell Bench Press'] }
+    const r = reviewWorkout({ session: removed, history: [last, removed], info, planned: PUSH })!
+    expect(r.improve).toEqual([])
+    expect(r.good).toContain('Did the full plan.')
+    // Left on the list but never done: that is skipped
+    const left = { ...sets, listed: ['Barbell Bench Press', 'Cable Lateral Raise'] }
+    const r2 = reviewWorkout({ session: left, history: [last, left], info, planned: PUSH })!
+    expect(r2.improve).toEqual(['Skipped Cable Lateral Raise from the plan.'])
+  })
+
   it('judges bodyweight moves on reps, without calling a low count a failure', () => {
     const a = workout('a', '2026-10-27', [['Dip', 3, 0, 5]])
     const b = workout('b', '2026-11-03', [['Dip', 3, 0, 6]])

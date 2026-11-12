@@ -13,7 +13,8 @@ entirely on free tiers (Supabase and Vercel).
   stalled lifts, muscles under or over target).
 - **Nutrition:** protein for the day with one-tap foods (shake, chicken, eggs, bacon, or grams), a
   target of bodyweight × g/kg, and a bodyweight trend. Food itself stays in your food app.
-- **Reminders:** push notifications sent by the server, with quiet hours and pause.
+- **Reminders:** push notifications sent by the server, with quiet hours and pause. The day after
+  a missed plan day, the reminder says so.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how data flows through the system.
 

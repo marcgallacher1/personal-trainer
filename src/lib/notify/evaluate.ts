@@ -26,6 +26,8 @@ export interface NotifyState {
   plan: { days: Partial<Record<number, string[]>> } | null
   /** A workout was started today (London) */
   workoutToday: boolean
+  /** Yesterday was a plan day and nothing was logged */
+  missedYesterday?: boolean
   /** A workout that's been started but not saved */
   openWorkout: { id: string; name: string | null; startedAt: string } | null
   bodyweightToday: boolean
@@ -159,8 +161,9 @@ export function dueNotifications(s: NotifyState): Due[] {
             r,
             'gym',
             `gym:${today.date}:${t}`,
-            'Training today 🏋️',
-            { pool: 'gym', vars: {} },
+            s.missedYesterday ? 'Back at it today 💪' : 'Training today 🏋️',
+            // Missed yesterday: say so, so it doesn't become two in a row
+            { pool: s.missedYesterday ? 'gym_after_miss' : 'gym', vars: {} },
             '/',
             r.skipIfLogged && s.workoutToday ? 'already logged' : undefined,
           )

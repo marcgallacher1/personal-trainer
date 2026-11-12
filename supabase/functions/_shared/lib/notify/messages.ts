@@ -5,7 +5,9 @@ import type { NotifyType, Tone } from './rules.ts'
 type Pool = Record<'chill' | 'motivational' | 'drill', string[]>
 
 /** {workout}, {goal}, {days}, {grams}, {pb} and {weeks} are filled in. */
-export const POOLS: Partial<Record<NotifyType | 'gym_followup' | 'bodyweight_followup', Pool>> = {
+export const POOLS: Partial<
+  Record<NotifyType | 'gym_followup' | 'gym_after_miss' | 'bodyweight_followup', Pool>
+> = {
   // Generic on purpose: the plan shifts day to day, so never name a workout
   gym: {
     chill: [
@@ -27,6 +29,19 @@ export const POOLS: Partial<Record<NotifyType | 'gym_followup' | 'bodyweight_fol
       'Excuses don’t build muscle. Training later today.',
       'You said you’d train. Later today. Be there.',
     ],
+  },
+  // The day after a missed plan day
+  gym_after_miss: {
+    chill: [
+      'Yesterday slipped, no stress. Get today’s in 👋',
+      'Missed yesterday. Today’s a fresh one.',
+    ],
+    motivational: [
+      'You missed yesterday. Don’t make it two in a row, come on 💪',
+      'Yesterday’s gone. Today counts double. Get it done.',
+      'One missed day is a blip. Two is a habit. Go today.',
+    ],
+    drill: ['Missed yesterday. Not today. Go.', 'Two days off in a row? Not happening. Train.'],
   },
   gym_followup: {
     chill: [

@@ -6,7 +6,14 @@ import { ratePlan, type MuscleGoal, type RatingWorkout } from '../rating/rate'
 import { EXERCISES } from '../seed/exercises'
 import { MUSCLES } from '../seed/muscles'
 import { isoWeek } from '../time/london'
-import { buildWeeklyReport, listNames, mondayOfIsoWeek, reportId, type ReportInput } from './weekly'
+import {
+  buildWeeklyReport,
+  listNames,
+  mondayOfIsoWeek,
+  reportId,
+  type ReportInput,
+  weekScore,
+} from './weekly'
 
 const info: Map<string, ExerciseInfo> = new Map(
   EXERCISES.map((e) => [
@@ -359,5 +366,29 @@ describe('reportId', () => {
     expect(reportId('user-1', '2026-W45')).toBe(a)
     expect(reportId('user-1', '2026-W46')).not.toBe(a)
     expect(reportId('user-2', '2026-W45')).not.toBe(a)
+  })
+})
+
+const m = (name: string, sets: number, min: number) => ({ name, sets, min })
+
+describe('week score', () => {
+  it('is 90% muscle sets against target, 10% following the plan', () => {
+    // Every muscle on target, but a mixed-up week that only half followed the plan
+    const mixed = weekScore([m('Chest', 12, 10), m('Back', 10, 10)], 0.5)!
+    expect(mixed.total).toBe(95)
+    expect(mixed.short).toEqual([])
+    // Plan followed to the letter, but half the sets
+    expect(weekScore([m('Chest', 5, 10), m('Back', 5, 10)], 1)!.total).toBe(55)
+  })
+
+  it('says which muscles fell short, worst first', () => {
+    const s = weekScore([m('Chest', 8, 10), m('Back', 10, 10), m('Calves', 0, 6)], null)!
+    expect(s.short.map((x) => x.name)).toEqual(['Calves', 'Chest'])
+    // No plan: the score is all muscle sets
+    expect(s.total).toBe(60)
+  })
+
+  it('needs at least one muscle with a target', () => {
+    expect(weekScore([m('Chest', 8, 0)], 1)).toBeNull()
   })
 })

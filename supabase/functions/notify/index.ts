@@ -186,6 +186,9 @@ async function loadState(db: SupabaseClient, userId: string, now: string): Promi
     .toISOString()
     .slice(0, 10)
   const historyDays = (history.data ?? []).map((s) => londonParts(s.started_at).date)
+  const yesterday = new Date(Date.parse(`${today.date}T12:00:00Z`) - 24 * HOUR)
+    .toISOString()
+    .slice(0, 10)
   const weight = Number(bodyweight.data?.[0]?.kg ?? p.bodyweight_kg ?? 0)
   const eaten = (protein.data ?? []).reduce((a, r) => a + Number(r.grams), 0)
 
@@ -203,6 +206,9 @@ async function loadState(db: SupabaseClient, userId: string, now: string): Promi
         : null,
     plan,
     workoutToday: (todaySessions.data ?? []).length > 0,
+    missedYesterday:
+      Boolean(plan?.days[((today.weekday + 5) % 7) + 1]?.length) &&
+      !historyDays.includes(yesterday),
     openWorkout: open ? { id: open.id, name: open.name, startedAt: open.started_at } : null,
     bodyweightToday: (bodyweight.data ?? []).some((b) => b.date === today.date),
     protein: { eaten, target: weight ? weight * Number(p.protein_g_per_kg ?? 1.8) : null },

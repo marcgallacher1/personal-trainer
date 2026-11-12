@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAbandoned, isEmptyWorkout } from './empty'
+import { discardOnBack, isAbandoned, isEmptyWorkout } from './empty'
 
 const NOW = Date.parse('2026-11-05T12:00:00Z')
 
@@ -10,6 +10,17 @@ describe('empty workouts', () => {
     expect(isEmptyWorkout({ notes: null, sets: 1, cardio: 0 })).toBe(false)
     expect(isEmptyWorkout({ notes: null, sets: 0, cardio: 1 })).toBe(false)
     expect(isEmptyWorkout({ notes: 'Gym was shut', sets: 0, cardio: 0 })).toBe(false)
+  })
+
+  it('keeps a workout you’ve set up when you go Back, but not a blank one', () => {
+    const none = { notes: null, sets: 0, cardio: 0 }
+    expect(discardOnBack({ ...none, exercises: 0, finished: false })).toBe(true)
+    // Exercises chosen, nothing logged yet: still there to resume
+    expect(discardOnBack({ ...none, exercises: 4, finished: false })).toBe(false)
+    // Renamed or with sets: obviously kept
+    expect(discardOnBack({ ...none, sets: 1, exercises: 1, finished: false })).toBe(false)
+    // Logged afterwards with nothing in it: nothing to resume
+    expect(discardOnBack({ ...none, exercises: 4, finished: true })).toBe(true)
   })
 
   it('only tidies away empty workouts over 12 hours old', () => {

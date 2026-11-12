@@ -175,7 +175,11 @@ export async function logSet(
     updated_at: now,
     deleted_at: null,
   }
-  await saveOne('sets', row)
+  const changes: Change[] = [{ table: 'sets', row }]
+  // First thing logged in a live workout: the clock starts here, not when you opened it
+  if (session && !session.ended_at && !today.some(live) && !(await hasCardio(session.id)))
+    changes.push({ table: 'sessions', row: { ...session, started_at: now } })
+  await save(changes)
   return { id: row.id, prs }
 }
 
@@ -198,6 +202,10 @@ export interface CardioInput {
   notes: string | null
   /** Speed, incline, intervals, pool… (see CardioDetails) */
   details_json?: CardioEntry['details_json']
+}
+
+async function hasCardio(sessionId: string): Promise<boolean> {
+  return (await db.cardio_entries.where('session_id').equals(sessionId).toArray()).some(live)
 }
 
 /** Creates a cardio entry, or updates `existing`. */
@@ -226,7 +234,15 @@ export async function saveCardio(
     updated_at: now,
     deleted_at: null,
   }
-  await saveOne('cardio_entries', row)
+  const changes: Change[] = [{ table: 'cardio_entries', row }]
+  // First thing logged in a live workout: it began when this cardio did
+  const session = await db.sessions.get(sessionId)
+  const sets = (await db.sets.where('session_id').equals(sessionId).toArray()).filter(live)
+  if (session && !session.ended_at && !others.length && !sets.length) {
+    const began = new Date(Date.parse(now) - input.duration_seconds * 1000).toISOString()
+    changes.push({ table: 'sessions', row: { ...session, started_at: began } })
+  }
+  await save(changes)
 }
 
 export async function deleteCardio(entry: CardioEntry): Promise<Change[]> {

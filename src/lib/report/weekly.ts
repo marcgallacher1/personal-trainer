@@ -61,6 +61,44 @@ export interface ReportAction {
   link?: { to: string; label: string }
 }
 
+/** How much of the week's score comes from muscle sets; the rest is following the plan */
+export const MUSCLE_WEIGHT = 0.9
+
+export interface WeekScore {
+  /** 0–100 */
+  total: number
+  /** 0–1: how close each muscle's sets were to its weekly minimum, averaged */
+  muscles: number
+  /** 0–1: how closely the plan's workouts were followed (null with no plan) */
+  plan: number | null
+  /** Muscles furthest under target, worst first (up to 3) */
+  short: { name: string; sets: number; min: number }[]
+}
+
+/**
+ * The week in one number. Mostly "did each muscle get the sets you said it would": which
+ * workouts they came from barely matters. Null when no muscle has a target.
+ */
+export function weekScore(
+  muscles: readonly Pick<MuscleVolume, 'name' | 'sets' | 'min'>[],
+  adherence: number | null,
+): WeekScore | null {
+  const targeted = muscles.filter((m) => m.min > 0)
+  if (!targeted.length) return null
+  const closeness = targeted.reduce((a, m) => a + Math.min(1, m.sets / m.min), 0) / targeted.length
+  const total = MUSCLE_WEIGHT * closeness + (1 - MUSCLE_WEIGHT) * (adherence ?? closeness)
+  return {
+    total: Math.round(total * 100),
+    muscles: closeness,
+    plan: adherence,
+    short: targeted
+      .filter((m) => m.sets < m.min)
+      .toSorted((a, b) => a.sets / a.min - b.sets / b.min)
+      .slice(0, 3)
+      .map((m) => ({ name: m.name, sets: m.sets, min: m.min })),
+  }
+}
+
 export interface WeeklyReport {
   version: 1
   week: string
@@ -69,6 +107,8 @@ export interface WeeklyReport {
   workouts: { done: number; planned: number | null; missed: string[] }
   /** 0–1, how closely the plan was followed */
   adherence: number | null
+  /** The week out of 100 (missing on reports saved before it existed) */
+  score?: WeekScore | null
   streak: number
   sets: number
   tonnage: number
@@ -228,6 +268,7 @@ export function buildWeeklyReport(input: ReportInput): WeeklyReport {
     final,
     workouts: { done: now.done, planned, missed },
     adherence,
+    score: weekScore(muscles, adherence),
     streak,
     sets: now.sets,
     tonnage: now.tonnage,

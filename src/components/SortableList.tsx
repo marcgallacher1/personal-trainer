@@ -63,7 +63,10 @@ export function SortableList<T>({ items, keyOf, enabled, render, onReorder }: Pr
               <button
                 type="button"
                 aria-label="Drag to reorder"
-                className="flex h-14 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl bg-surface text-xl text-muted active:cursor-grabbing"
+                className="flex h-14 w-11 shrink-0 cursor-grab items-center justify-center rounded-xl bg-surface text-xl text-muted active:cursor-grabbing"
+                // Inline, because the global button rule (touch-action: manipulation) beats a class,
+                // and then the phone scrolls instead and cancels the drag
+                style={{ touchAction: 'none' }}
                 onPointerDown={(e) => {
                   e.currentTarget.setPointerCapture(e.pointerId)
                   setDrag({

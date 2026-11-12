@@ -16,6 +16,7 @@ import {
   type CardioEntry,
   type Exercise,
   type Session,
+  type SessionExercise,
   type SetRow,
 } from '../../db/queries'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -23,7 +24,14 @@ import { db } from '../../db/local'
 import { describeTargets } from '../../lib/plans/targets'
 import { ExerciseList } from '../exercises/ExerciseList'
 import { addWorkoutExerciseToPlan, discardIfEmpty } from '../plans/data'
-import { addExercise, deleteSession, finishSession, undoDeletion, updateSession } from './actions'
+import {
+  addExercise,
+  deleteSession,
+  finishSession,
+  removeSessionExercise,
+  undoDeletion,
+  updateSession,
+} from './actions'
 import {
   cardioEmoji,
   cardioLeft,
@@ -34,6 +42,8 @@ import {
   type PlannedCardio,
 } from '../../lib/cardio'
 import { CardioLogger } from './CardioLogger'
+import { TimeSheet } from './TimeSheet'
+import { SwipeToRemove } from '../../components/SwipeToRemove'
 import { asLogType, formatSet } from '../../lib/logging/logTypes'
 import { asLoadMode, type LoadMode, type LogType } from '../../lib/logging/types'
 import { ExerciseLogger } from './ExerciseLogger'
@@ -54,6 +64,7 @@ export function SessionScreen() {
   const [picking, setPicking] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [reordering, setReordering] = useState(false)
+  const [timing, setTiming] = useState(false)
   /** 'new' = adding cardio; an entry = editing it */
   const [cardioOpen, setCardioOpen] = useState<CardioEntry | 'new' | PlannedCardio | null>(null)
   // The plan's cardio for this workout, if it was started from one
@@ -105,11 +116,19 @@ export function SessionScreen() {
   const openIndex = list.findIndex((se) => se.id === openId)
   const open = openIndex >= 0 ? list[openIndex] : undefined
 
+  /** Picker tap: adds the exercise (the picker stays open), or takes it off again. */
   async function pick(e: Exercise) {
-    setPicking(false)
     const s = session!
+    const existing = list.find((se) => se.exercise_id === e.id)
+    if (existing) {
+      if (allSets.some((x) => x.session_exercise_id === existing.id)) {
+        showToast({ message: `${e.name} has sets logged, so it stays` })
+        return
+      }
+      await removeSessionExercise(existing)
+      return
+    }
     const seId = await addExercise(s.id, e)
-    setOpenId(seId)
     // Workout from a plan: offer to keep this exercise in the plan for next time
     if (s.plan_session_id) {
       const planSessionId = s.plan_session_id
@@ -129,6 +148,15 @@ export function SessionScreen() {
     }
   }
 
+  /** Swiped off the list: gone from today's workout (the plan is untouched), with Undo. */
+  async function swipeAway(se: SessionExercise) {
+    const changes = await removeSessionExercise(se)
+    showToast({
+      message: `Removed ${byId.get(se.exercise_id)?.name ?? 'exercise'}`,
+      action: { label: 'Undo', onClick: () => void undoDeletion(changes) },
+    })
+  }
+
   async function remove(s: Session) {
     setConfirmDelete(false)
     const changes = await deleteSession(s)
@@ -146,7 +174,7 @@ export function SessionScreen() {
           fallback="/"
           onBack={async () => {
             // Nothing logged? Don't leave an empty workout behind.
-            const removed = await discardIfEmpty(session.id)
+            const removed = await discardIfEmpty(session.id, { onBack: true })
             if (removed)
               showToast({
                 message: 'Empty workout cancelled',
@@ -166,11 +194,17 @@ export function SessionScreen() {
           }}
         />
         <p className="text-sm text-muted">
-          {active ? (
-            <LiveDuration since={session.started_at} />
-          ) : (
-            formatDuration(session.started_at, session.ended_at)
-          )}
+          {/* Tap the time to correct it. Deliberately not a visible button: it's rarely needed */}
+          <button type="button" aria-label="Change workout time" onClick={() => setTiming(true)}>
+            {!active ? (
+              formatDuration(session.started_at, session.ended_at)
+            ) : allSets.length || cardioList.length ? (
+              <LiveDuration since={session.started_at} />
+            ) : (
+              // The clock starts with the first set
+              'Not started'
+            )}
+          </button>
           {' · '}
           {list.length} exercise{list.length === 1 ? '' : 's'} · {workingSets.length} sets
           {cardioList.length > 0 && ` · ${cardioList.length} cardio`}
@@ -205,20 +239,22 @@ export function SessionScreen() {
             enabled={reordering}
             onReorder={(next) => void saveOrder('session_exercises', next)}
             render={(se) => (
-              <SummaryCard
-                name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
-                logType={asLogType(byId.get(se.exercise_id)?.log_type)}
-                loadMode={asLoadMode(byId.get(se.exercise_id)?.load_mode)}
-                sets={allSets.filter((s) => s.session_exercise_id === se.id)}
-                planned={plannedFor(
-                  se.plan_exercise_id,
-                  asLogType(byId.get(se.exercise_id)?.log_type),
-                )}
-                notes={se.notes}
-                onOpen={() => {
-                  if (!reordering) setOpenId(se.id)
-                }}
-              />
+              <SwipeToRemove enabled={!reordering} onRemove={() => void swipeAway(se)}>
+                <SummaryCard
+                  name={byId.get(se.exercise_id)?.name ?? 'Unknown exercise'}
+                  logType={asLogType(byId.get(se.exercise_id)?.log_type)}
+                  loadMode={asLoadMode(byId.get(se.exercise_id)?.load_mode)}
+                  sets={allSets.filter((s) => s.session_exercise_id === se.id)}
+                  planned={plannedFor(
+                    se.plan_exercise_id,
+                    asLogType(byId.get(se.exercise_id)?.log_type),
+                  )}
+                  notes={se.notes}
+                  onOpen={() => {
+                    if (!reordering) setOpenId(se.id)
+                  }}
+                />
+              </SwipeToRemove>
             )}
           />
         </section>
@@ -339,9 +375,9 @@ export function SessionScreen() {
 
       <Sheet
         open={picking}
-        title="Add exercise"
-        subtitle="Search or filter by muscle, then tap an exercise."
-        closeLabel="Cancel"
+        title="Add exercises"
+        subtitle="Tap to add, tap again to remove."
+        closeLabel="Done"
         onClose={() => setPicking(false)}
       >
         <ExerciseList
@@ -376,6 +412,8 @@ export function SessionScreen() {
           onClose={() => setOpenId(null)}
         />
       )}
+
+      {timing && <TimeSheet session={session} onClose={() => setTiming(false)} />}
 
       {cardioOpen && (
         <CardioLogger

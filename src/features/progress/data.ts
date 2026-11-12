@@ -30,12 +30,18 @@ export function useTrainingData(): TrainingData | undefined {
   const ctx = useRatingContext()
   const library = usePlanLibrary()
   const logged = useLiveQuery(async () => {
-    const [sessions, sets, exercises, cardio] = await Promise.all([
+    const [sessions, sets, exercises, cardio, listedRows] = await Promise.all([
       db.sessions.toArray(),
       db.sets.toArray(),
       db.exercises.toArray(),
       db.cardio_entries.toArray(),
+      db.session_exercises.toArray(),
     ])
+    // Exercises on each workout's list, for "what was agreed" in the rating
+    const listed = new Map<string, string[]>()
+    for (const r of listedRows) {
+      if (live(r)) listed.set(r.session_id, [...(listed.get(r.session_id) ?? []), r.exercise_id])
+    }
     // Cardio-only workouts count too (e.g. a planned run day)
     const withCardio = new Set(cardio.filter(live).map((c) => c.session_id))
     const modeOf = new Map(exercises.map((e) => [e.id, asLoadMode(e.load_mode)]))
@@ -68,6 +74,7 @@ export function useTrainingData(): TrainingData | undefined {
           name: s.name,
           planId: s.plan_id,
           planSessionId: s.plan_session_id,
+          listed: listed.get(s.id),
           sets: bySession.get(s.id) ?? [],
         }))
         .toSorted((a, b) => a.startedAt.localeCompare(b.startedAt)),

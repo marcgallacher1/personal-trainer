@@ -113,8 +113,9 @@ export function ExerciseLogger({ se, exercise, sets, lastSetAt = null, onClose }
 
   const nextInitial: EditorValue = {
     ...draft,
-    // Follow the plan's set type (e.g. a planned warm-up) when there is one
-    set_type: (nextTarget?.set_type as SetType | undefined) ?? draft.set_type,
+    // Follow the plan's set type (e.g. a planned warm-up) when there is one. Otherwise back to
+    // a working set: a drop or failure set doesn't carry over to the next one
+    set_type: (nextTarget?.set_type as SetType | undefined) ?? 'working',
     rir: null,
   }
 

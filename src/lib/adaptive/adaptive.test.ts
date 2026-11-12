@@ -243,9 +243,39 @@ describe('missed workouts', () => {
     }
   })
 
-  it('suggests a later day if you’ve already trained today, and folds into the next workout', () => {
-    // Wed: Push (Mon) missed; Pull done Tue; trained Wed already
+  it('counts a custom workout that trained the same muscles (the Coach agrees with Next up)', () => {
+    // Mon's Push was missed. Tue: a custom chest and delts workout, not started from the plan
+    // and with different exercises. That covers Push, so no "You missed Push".
+    const custom = logged('c', addDays(MON, 1), [
+      ['Incline Dumbbell Press', 4, 25],
+      ['Dumbbell Lateral Raise', 4, 10],
+    ])
+    const p = buildProposals(proposalInput({ today: addDays(MON, 1), sessions: [custom] }))
+    expect(p.filter((x) => x.kind === 'missed')).toEqual([])
+  })
+
+  it('stays quiet after training today when the missed workout is what’s next up', () => {
+    // Wed: Push (Mon) missed; Pull done Tue; trained legs today. Next up is Push: no card
     const sessions = [pullDone, logged('c', addDays(MON, 2), [['Leg Press', 3, 100]])]
+    const p = buildProposals(proposalInput({ today: addDays(MON, 2), sessions }))
+    expect(p.filter((x) => x.kind === 'missed')).toEqual([])
+  })
+
+  it('suggests a later day if you’ve already trained today, and folds into the next workout', () => {
+    // Wed: Push (Mon) missed; Pull done Tue. Today's workout (logged as Pull) worked chest and
+    // delts hard, so Next up is Legs, not Push: the card offers to fit Push in elsewhere
+    const sessions = [
+      pullDone,
+      logged(
+        'c',
+        addDays(MON, 2),
+        [
+          ['Barbell Bench Press', 4, 60],
+          ['Cable Lateral Raise', 4, 10],
+        ],
+        'Pull',
+      ),
+    ]
     const [p] = buildProposals(proposalInput({ today: addDays(MON, 2), sessions }))
     expect(p?.title).toBe('You missed Push')
     expect(p!.options).toEqual([

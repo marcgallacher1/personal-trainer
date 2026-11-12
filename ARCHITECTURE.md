@@ -122,11 +122,27 @@ won't time out while your finger is on it.
 
 **Empty workouts** (no sets, cardio or notes, `src/lib/logging/empty.ts`) don't stick around:
 
-- Back from one cancels it (with Undo), whether it was live or logged afterwards.
+- Back from a blank one (no exercises either) cancels it, with Undo. A live workout with
+  exercises chosen is kept, so you can set one up, leave the screen and Resume it from Today. One
+  logged afterwards with nothing in it is cancelled, as there's nothing to resume.
 - Save workout stays greyed out until a set or some cardio is logged.
 - A double tap in the start picker only starts one workout.
 - Shortly after the app opens, empty workouts over 12 hours old are removed
   (`sweepEmptyWorkouts`), e.g. ones left by switching tabs.
+
+**During a workout:**
+
+- The exercise picker stays open and ticks what you add; tap again to take it off.
+- Swipe an exercise left to remove it from today's workout (`SwipeToRemove`); the plan is untouched.
+- The clock starts at the first set (or cardio), not when the workout was opened. Before that the
+  header says "Not started".
+- A live workout with nothing logged for 30 minutes saves itself, ending at the last set
+  (`src/lib/logging/autosave.ts`, checked every minute and when the app comes back into view).
+- Tapping the duration text opens a small sheet to correct the day, start time and length.
+- After a drop or failure set, the next set goes back to a working set unless the plan says otherwise.
+
+Drag handles and swipes set `touch-action` inline: the global button rule
+(`touch-action: manipulation`) beats a utility class, and the phone then scrolls and cancels the drag.
 
 ## Notifications
 
@@ -174,6 +190,10 @@ All of this is pure, tested logic in `src/lib`. Nothing changes the plan without
 - **Suggested today** (`plans/suggest.ts`) picks from the plan workouts not done this week. Muscles
   trained in the last 48 h count against a workout, and missed workouts come before today's scheduled
   one.
+- **Done this week** (`weekDone` in `plans/suggest.ts`) is one rule shared by Start workout and
+  the Coach, so they can't disagree. A workout started from the plan counts for that plan workout.
+  Any other workout counts for the plan workout whose main muscles it trained most (at least half
+  of them, 3+ sets each), so a custom or mixed-up session still ticks off what it covered.
 
 ## Analysis
 
@@ -182,8 +202,12 @@ All of this is pure, tested logic in `src/lib`. Nothing changes the plan without
   due so far. Fair swaps count in full.
 - **Workout rating** (`review/workout.ts`): starts at 100, and every point taken off comes with a
   "To work on" reason, e.g. down vs last time, skipped plan exercises, too many sets for one muscle,
-  easy sets, or a very long session. It's worked out when you view it; nothing is stored.
-- **Weekly report** (`report/weekly.ts`): see Principles above.
+  easy sets, or a very long session. It's worked out when you view it; nothing is stored. It's
+  judged against the plan as agreed for that workout (`agreedPlan`): exercises taken off the list
+  aren't "skipped", ones left on it with no sets are.
+- **Weekly report** (`report/weekly.ts`): see Principles above. A finished week gets a score out
+  of 100 (`weekScore`): 90% how close each muscle's sets were to its weekly minimum, 10% how
+  closely the plan's workouts were followed. Which workouts the sets came from barely matters.
 
 ## Nutrition
 

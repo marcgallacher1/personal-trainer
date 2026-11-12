@@ -128,6 +128,13 @@ describe('go to the gym', () => {
     expect(d!.body).not.toContain('Push A')
   })
 
+  it('mentions it if you missed yesterday’s workout', () => {
+    const [d] = dueNotifications(state(`${MON}T15:00:00Z`, { missedYesterday: true }))
+    expect(d!.title).toBe('Back at it today 💪')
+    expect(d!.body).toMatch(/yesterday|two|blip/i)
+    expect(d!.body).not.toContain('Push A')
+  })
+
   it('stays quiet on rest days, but covers every day with no plan (Sat 10:00, Sun 13:00)', () => {
     expect(keys(state('2026-11-04T15:00:00Z'))).toEqual([]) // Wednesday, rest
     expect(keys(state('2026-11-04T15:00:00Z', { plan: null }))).toEqual(['gym:2026-11-04:15:00'])

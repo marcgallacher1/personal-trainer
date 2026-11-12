@@ -28,6 +28,8 @@ export interface TrainingSession {
   name: string | null
   planId: string | null
   planSessionId: string | null
+  /** Exercises on the workout's list (with or without sets). Missing on old data. */
+  listed?: readonly string[]
   sets: TrainingSet[]
 }
 

@@ -271,6 +271,7 @@ const ISOLATION: Row[] = [
   ['EZ-Bar Curl', 'barbell', 'isolation', ['biceps'], ['forearms']],
   ['Dumbbell Curl', 'dumbbell', 'isolation', ['biceps'], ['forearms']],
   ['Hammer Curl', 'dumbbell', 'isolation', ['biceps', 'forearms'], []],
+  ['Rope Hammer Curl', 'cable', 'isolation', ['biceps', 'forearms'], []],
   ['Incline Dumbbell Curl', 'dumbbell', 'isolation', ['biceps'], []],
   ['Preacher Curl', 'machine', 'isolation', ['biceps'], []],
   ['Cable Curl', 'cable', 'isolation', ['biceps'], ['forearms']],

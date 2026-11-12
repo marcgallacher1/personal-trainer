@@ -43,6 +43,20 @@ function best(sets: readonly TrainingSet[]): { value: number; byReps: boolean } 
   return { value: Math.max(...working.map((s) => s.reps)), byReps: true }
 }
 
+/**
+ * The plan as agreed for this workout: the plan workout minus anything taken off the list.
+ * So removing exercises before or during the workout isn't "skipping"; leaving one on the
+ * list with no sets is. Null when nothing of the plan is left.
+ */
+export function agreedPlan(
+  planned: PlannedWorkout | null,
+  listed: readonly string[] | undefined,
+): PlannedWorkout | null {
+  if (!planned || !listed) return planned
+  const kept = planned.exercises.filter((e) => listed.includes(e.exerciseId))
+  return kept.length ? { ...planned, exercises: kept } : null
+}
+
 export function verdictForWorkout(score: number): string {
   if (score >= 85) return 'Great session'
   if (score >= 70) return 'Solid session'
@@ -51,7 +65,8 @@ export function verdictForWorkout(score: number): string {
 }
 
 export function reviewWorkout(input: ReviewInput): WorkoutReview | null {
-  const { session, history, info, planned } = input
+  const { session, history, info } = input
+  const planned = agreedPlan(input.planned, session.listed)
   const working = session.sets.filter(isWorking)
   if (!working.length) return null
   const name = (id: string) => info.get(id)?.name ?? 'Exercise'

@@ -4,7 +4,8 @@ import { db } from '../../db/local'
 import type { Exercise, Session, SessionExercise } from '../../db/queries'
 import { requireUserId } from '../../db/user'
 import { deletion, newId, nowIso, save, saveOne, type Change } from '../../db/write'
-import { isAbandoned, isEmptyWorkout } from '../../lib/logging/empty'
+import { autoSaveAt } from '../../lib/logging/autosave'
+import { discardOnBack, isAbandoned, isEmptyWorkout } from '../../lib/logging/empty'
 import { isTimed, type LogType } from '../../lib/logging/types'
 import {
   buildPlanFromDraft,
@@ -657,21 +658,46 @@ async function contentOf(sessionId: string) {
 }
 
 /**
- * Deletes a workout with nothing logged, live or logged afterwards. Returns the changes (for
- * Undo), or null if it was kept.
+ * Deletes a workout with nothing in it. Returns the changes (for Undo), or null if it was kept.
+ * On Back (`onBack`), an in-progress workout with exercises chosen is kept to resume; the
+ * 12-hour tidy-up removes anything with nothing logged.
  */
-export async function discardIfEmpty(sessionId: string): Promise<Change[] | null> {
+export async function discardIfEmpty(
+  sessionId: string,
+  { onBack = false }: { onBack?: boolean } = {},
+): Promise<Change[] | null> {
   const session = await db.sessions.get(sessionId)
   if (!session || session.deleted_at) return null
   const c = await contentOf(sessionId)
-  if (!isEmptyWorkout({ notes: session.notes, sets: c.sets.length, cardio: c.cardio.length }))
-    return null
+  const content = { notes: session.notes, sets: c.sets.length, cardio: c.cardio.length }
+  const discard = onBack
+    ? discardOnBack({ ...content, exercises: c.items.length, finished: Boolean(session.ended_at) })
+    : isEmptyWorkout(content)
+  if (!discard) return null
   const changes = [
     ...c.items.map((i) => deletion('session_exercises', i)),
     deletion('sessions', session),
   ]
   await save(changes)
   return changes
+}
+
+/**
+ * Saves live workouts with nothing logged for 30 minutes, ending them at the last set or cardio.
+ * Returns how many were saved.
+ */
+export async function autoSaveStale(): Promise<number> {
+  const open = (await db.sessions.toArray()).filter((s) => live(s) && !s.ended_at)
+  let saved = 0
+  for (const s of open) {
+    const c = await contentOf(s.id)
+    const logged = [...c.sets, ...c.cardio].map((x) => x.completed_at)
+    const endAt = autoSaveAt(s, logged, Date.now())
+    if (!endAt) continue
+    await saveOne('sessions', { ...s, ended_at: endAt })
+    saved++
+  }
+  return saved
 }
 
 /** Removes empty workouts over 12 hours old (e.g. left via the tab bar). Returns how many. */
